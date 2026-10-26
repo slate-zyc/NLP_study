@@ -43,16 +43,18 @@ import joblib  # 用于对象保存与加载的
 # todo 1. 定义函数, 演示 获取 one-hot编码
 def dm01_onehot_gen():
     # 1. 准备语料(人名, 模拟: 句子切词后的内容)
-    vocabs = {'周杰伦', '陈奕迅', '王力宏', '夯哥', '李巍巍', '查成龙'}
+    vocabs = ["周杰伦", "陈奕迅", "王力宏", "李宗盛", "吴亦凡", "鹿晗"]
 
     # 2. 实例化 词汇映射器Tokenizer
     my_tokenizer = Tokenizer()
     # 3. 通过 词汇映射器, 在语料库上进行训练.
     my_tokenizer.fit_on_texts(vocabs)
     # 4. 打印 word_index字典, 键: 歌手名, 值: 索引(序号)
-    # 格式为: {'王力宏': 1, '周杰伦': 2, '查成龙': 3, '李宗盛': 4, '李巍巍': 5, '陈奕迅': 6}
+    # 格式为: {'周杰伦': 1, '陈奕迅': 2, '王力宏': 3, '李宗盛': 4, '吴亦凡': 5, '鹿晗': 6}
     print(my_tokenizer.word_index)
-    print(' -.- ' * 6)  # 分割线
+    # print(my_tokenizer.index_word)
+    # {1: '周杰伦', 2: '陈奕迅', 3: '王力宏', 4: '李宗盛', 5: '吴亦凡', 6: '鹿晗'}
+    print('-' * 30)  # 分割线
 
     # 5. 对每个词(歌手名)进行 one-hot编码
     for vocab in vocabs:
@@ -75,10 +77,10 @@ def use_one_hot():
     # 1. 加载训练好的 词汇映射器
     my_tokenizer = joblib.load('./model/onehot_tokenizer.pkl')
     # 2. 打印加载的词汇映射器的 word_index字典, 查看 词汇和索引的对应关系.
-    print(my_tokenizer.word_index)  # {'王力宏': 1, '周杰伦': 2, '夯哥': 3, '陈奕迅': 4, '查成龙': 5, '李巍巍': 6}
+    print(my_tokenizer.word_index)
 
     # 3. 对指定词汇进行 one-hot编码
-    token = '夯哥'
+    token = '李宗盛'
     # 4. 创建长度 = (词汇和索引字典)长度的列表, 列表内元素都是 0
     zero_list = [0] * len(my_tokenizer.word_index)
     # 5. 获取指定词汇在 word_index中的索引, 因为索引是从1开始, 所以索引要减1
@@ -92,12 +94,12 @@ def use_one_hot():
 # todo 3(扩展). one-hot编码的简单版 实现方式.
 def simple_one_hot():
     # 1. 准备语料库.
-    vocabs = {'周杰伦', '陈奕迅', '王力宏', '夯哥', '李巍巍', '查成龙'}
+    vocabs = ["周杰伦", "陈奕迅", "王力宏", "李宗盛", "吴亦凡", "鹿晗"]
 
     # 2. 构建词汇 到 索引 的映射关系(字典)
     # 词汇: 键,  索引: 值
     word2index = {vocab: i for i, vocab in enumerate(vocabs)}
-    print(word2index)       # {'李巍巍': 0, '查成龙': 1, '夯哥': 2, '王力宏': 3, '陈奕迅': 4, '周杰伦': 5}
+    print(word2index)   # {'周杰伦': 0, '陈奕迅': 1, '王力宏': 2, '李宗盛': 3, '吴亦凡': 4, '鹿晗': 5}
 
     # 3. 对每个词汇进行 one-hot编码
     for vocab in vocabs:
@@ -114,10 +116,10 @@ def simple_one_hot():
 # todo 4. 测试代码
 if __name__ == '__main__':
     # 1. 测试: one-hot编码
-    # dm01_onehot_gen()
+    dm01_onehot_gen()
 
     # 2. 测试: 使用one-hot编码
-    # use_one_hot()
+    use_one_hot()
 
     # 3. 测试: one-hot编码的简单版
     simple_one_hot()
