@@ -18,6 +18,10 @@ word2vec介绍:
 关于 fasttext的安装:
     pip install fasttext        直接装即可, 如果报错, 就装如下的 编译版本.
     pip install fasttext-wheel  如果上述命令报错, 则执行这个命令即可.  我的版本是: 0.9.2
+    # 上面两个都暂不支持python 3.13
+    ## 不用管这一部分了，全是高度封装的东西
+    # 用这个包主要是因为这个数据类型，正常可以用gensim包
+
 """
 
 # 导包
