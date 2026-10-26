@@ -9,12 +9,16 @@
         边办证, 边干活. 训练过程中, 词向量会自动生成. -> 就是以前我们学RNN的 词嵌入层.
 
 细节: 如果你要看TensorBoard的可视化界面(本质就是一个 PCA主成分分析图), 代码写完后, 按照如下操作即可.
-    step1: 切换到 nlpbase 沙箱
-    step2: 切换到当前项目(这里是day02)的路径下, 即: 有 runs文件夹的那个目录下.
-    step3: 运行如下的命令即可
-        tensorboard --logdir=runs --host 0.0.0.0
-    step4: 通过 localhost:6006 访问即可.
-        注意: 第一次加载会慢一点, 你稍微等会儿.
+    step1: 运行本脚本, 词向量会写到: E:\tb_runs\05_word_embedding (纯英文路径)
+    step2: 在任意目录打开终端, 运行如下命令即可 (注意: logdir 用绝对路径)
+        tensorboard --logdir=E:\tb_runs\05_word_embedding --host 127.0.0.1
+    step3: 浏览器访问 http://localhost:6006, 然后点顶部的 PROJECTOR 标签, 3D图就在那里.
+        注意: 第一次加载会慢一点, 你稍微等会儿; 如果没看到 PROJECTOR 标签, 刷新一次页面即可.
+
+为什么日志不写到项目目录下的 ./runs ?
+    因为本项目路径里带中文(chapter01_文本预处理), 而 TensorFlow 2.21 的 tf.io.gfile.isdir()
+    在 Windows 上遇到中文路径会抛 UnicodeDecodeError, 导致 TensorBoard 的 projector 插件
+    读取 metadata.tsv 时返回 500, 3D 图加载不出来. 换成纯英文的日志路径就绕开了这个 bug.
 """
 
 # 禁用oneDNN优化包...
@@ -24,10 +28,12 @@ os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 # 导包
 import torch                                                    # 深度学习框架, 封装了和张量相关的各种操作
 from tensorflow.keras.preprocessing.text import Tokenizer       # 词汇映射器.
-from torch.utils.tensorboard import SummaryWriter               # 可视化 词向量
 import jieba                                                    # 分词器.
 import torch.nn as nn                                           # 神经网络模块
-
+from torch.utils.tensorboard import SummaryWriter               # 可视化 词向量 (torch 官方写法)
+# 说明: 之前因为项目路径带空格/中文, torch 自带的 SummaryWriter 会报错, 所以换成了 tensorboardX;
+#      现在日志目录已改成纯英文路径(E:\tb_runs\05_word_embedding), 所以改回 torch 官方写法,
+#      和课程代码保持一致.
 
 # todo 1. 定义函数, 演示: word Embedding将文本转成词向量, 并可视化.
 def dm01_embedding_show():
@@ -63,6 +69,7 @@ def dm01_embedding_show():
     # 4.3 查看 词 和 索引的映射关系.
     # {'是': 1, '黑马': 2, '我': 3, '传智': 4, '教育': 5, '一家': 6, '上市公司': 7, '，': 8, '旗下': 9, '有': 10, '程序员': 11, '品牌': 12, '。': 13, '在': 14, '这里': 15, '学习': 16, '人工智能': 17, '爱': 18, '自然语言': 19, '处理': 20}
     print(f'词和索引的映射关系: {my_tokenizer.word_index}')
+    # 字典的键是唯一的，所以返回的是去重之后的.
 
     # 4.4 获取去重后的 所有词汇列表.
     my_token_list = my_tokenizer.word_index.values()
@@ -75,31 +82,38 @@ def dm01_embedding_show():
 
     # 5. 创建 词嵌入层, 把文本(即: 词对应的编号) 转成 词向量.
     # 5.1 创建 词嵌入层对象.
-    # 参1: 词汇表大小, 即: 唯一的词的个数.        参2: 词向量的维度
-    embed = nn.Embedding(num_embeddings=len(my_token_list), embedding_dim=8)
+    # 参1: 词汇表大小. 注意: Tokenizer 的词编号是从 1 开始的(0 留给 padding/填充位),
+    #      所以 Embedding 的行数要比"词的个数"多 1 => 0 号行是 padding 占位,
+    #      1~20 号行才分别对应 词编号 1~20 的词.
+    # 参2: 词向量的维度
+    embed = nn.Embedding(num_embeddings=len(my_token_list) + 1, embedding_dim=8)
     # 5.2 查看 词嵌入层的 权重参数(即: 词向量)
     print(f'embed: {embed.weight.data}')
-    print(f'embed.shape: {embed.weight.data.shape}')        # torch.Size([20, 8])
-    print(' =.= ' * 10)
+    print(f'embed.shape: {embed.weight.data.shape}')        # torch.Size([21, 8])
+    print('-' * 30)
 
     # 6. 词向量可视化
-    # 6.1 创建TensorBoard写入器, 将数据写入到 runs 目录
-    my_summary = SummaryWriter(log_dir='./runs')
+    # 6.1 创建TensorBoard写入器, 将数据写入到 纯英文路径 的日志目录
+    #     说明: torch 版每次运行都会重写 projector_config.pbtxt, 重复跑不会叠加重复条目.
+    my_summary = SummaryWriter(log_dir=r'E:\tb_runs\05_word_embedding')
     # 6.2 将词向量 和 对应的词语 添加到 TensorBoard中
-    # 参1: 词向量矩阵, 形状是: (20, 8), 20个词, 每个词用8个数字表示(8维)
-    # 参2: 对应的词语列表, 用来标注每个点.
-    my_summary.add_embedding(embed.weight.data, my_token_list)
+    # 参1: 词向量矩阵, 跳过第 0 行(padding 占位), 只取 1~20 号行, 形状是: (20, 8),
+    #      20个词, 每个词用8个数字表示(8维)
+    # 参2: 对应的词语列表(顺序 = 词编号 1~20), 用来标注每个点.
+    words = [my_tokenizer.index_word[i] for i in range(1, len(my_token_list) + 1)]
+    my_summary.add_embedding(embed.weight.data[1:], words)
     # 6.3 关闭写入器
     my_summary.close()
 
     # 7. 查看每个单词对应的词向量.
-    for idx in range(len(my_tokenizer.word_index)): # idx的范围: [0, 20)
+    # 词编号从 1 开始, 所以直接拿 词编号 当 Embedding 的行号即可, 不再做 +1 / -1 的换算.
+    for wid in range(1, len(my_tokenizer.word_index) + 1): # wid 的范围: [1, 20]
         # 7.1 获取当前单词对应的词向量.
-        temp_vector = embed(torch.tensor(idx))
+        temp_vector = embed(torch.tensor(wid))
         # print(f'词向量: {temp_vector}')       # tensor([ 0.1227,  0.6931,  0.0187,  1.3011,  0.1021,  2.4951,  0.8910, -0.1551], grad_fn=<EmbeddingBackward0>)
 
-        # 7.2 获取当前索引对应的单词, my_tokenizer.index_word的索引是从1开始的.
-        word = my_tokenizer.index_word[idx + 1]
+        # 7.2 获取当前编号对应的单词, my_tokenizer.index_word的键是从1开始的.
+        word = my_tokenizer.index_word[wid]
         print(f'单词: {word}, 词向量: {temp_vector.detach().numpy()}')
 
 
