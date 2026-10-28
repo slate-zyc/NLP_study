@@ -16,17 +16,15 @@ def dm01_map():
     # 2. 第一次遍历map对象.
     for i in result:
         print(i)                    # 依次输出: 3, 4, 5, 6, 7
-    print(' -.- ' * 10)
+    print('-' * 30)
 
     # 3. 第二次尝试遍历map对象.
     print(f'result: {list(result)}')    # []
-    print(' -.- ' * 10)
+    print('-' * 30)
 
     # 4. 使用 lambda表达式实现 相同功能.
     result2 = list(map(lambda x: x + 2, [10, 20, 30]))
     print(f'result2: {result2}')
-
-
 
 
 # 需求2: 演示 chain()函数的用法.
@@ -35,6 +33,9 @@ from itertools import chain
 import jieba
 
 # 定义函数, 测试: chain()函数的用法.
+
+# itertools.chain()：把多个可迭代对象串联成一个迭代器。
+
 def dm02_chain():
     # 1. 定义2个列表.
     list1, list2 = [1, 2, 3], [2, 3, 4]
@@ -67,6 +68,10 @@ def dm02_chain():
     list1 = ['今天天很好', '今天天很热']
     result = set(chain(*map(lambda x: jieba.lcut(x), list1)))
     print(f'result: {result}')
+
+    # 7. 优化版：全程惰性，即防止 * 破坏 map 的惰性
+    result2 = set(chain.from_iterable(map(lambda x: jieba.lcut(x), list1)))
+    print(f'result2: {result2}')
 
 
 
@@ -103,10 +108,10 @@ def dm03_zip():
 # todo n. 测试代码
 if __name__ == '__main__':
     # 1. 测试: map() 函数的用法
-    # dm01_map()
+    dm01_map()
 
     # 2. 测试: chain() 函数的用法
-    # dm02_chain()
+    dm02_chain()
 
     # 3. 测试: zip() 函数的用法
     dm03_zip()
