@@ -25,7 +25,7 @@ from wordcloud import WordCloud     # 词云包
 
 # 解决中文乱码问题
 plt.rcParams['font.sans-serif'] = ['SimHei']        # 如果是Mac本, 可以换成: 'Arial Unicode  MS'
-plt.rcParams['axes.unicode_minus'] = False
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 
 
 # todo 1. 定义函数, 实现: 训练集 和 测试集的 标签分布的  可视化统计.
@@ -40,7 +40,7 @@ def dm01_label_sns_countplot():
     # print(train_data.head())
 
     # 3. 统计训练集标签的 0(负样本) 和 1(正样本) 的数量, 并可视化, 采用: 计数柱状图.
-    # 参1: x轴标签,  参2: 数据集,  参3: 用于分组的分类变量,  参4: 是否显示图例(默认为True)
+    # 参1: 指定分类列,  参2: 数据集,  参3: 按指定分类变量给点上色,  参4: 是否显示图例(默认为True)
     sns.countplot(x='label', data=train_data, hue='label', legend=False)
     plt.title('train_label')    # 设置标题
     plt.tight_layout()          # 紧凑布局
@@ -64,7 +64,7 @@ def dm02_len_sns_distplot():
     # train_data['sentence_length'] = list(map(函数对象的功能是 获取句子长度, 句子))
     train_data['sentence_length'] = list(map(lambda x: len(x), train_data['sentence']))
 
-    # 思路2: apply()函数的方式实现.
+    # 思路2: apply()函数的方式实现. pandas包里面的内容
     # train_data['sentence_length'] = train_data['sentence'].apply(lambda x: len(x))
     # print(train_data.head())
 
@@ -77,11 +77,12 @@ def dm02_len_sns_distplot():
 
     # 图2: 密度曲线图.
     # 旧版写法
-    # sns.displot(x='sentence_length', data=train_data, kde=True)
+    # sns.displot(x=train_data['sentence_length'])
     # plt.yticks([])
     # plt.show()
 
     # histplot() 直方图
+    ## kde: 核密度曲线
     sns.histplot(x='sentence_length', data=train_data, kde=True)
     plt.title('训练集句子长度分布_密度曲线图')
     plt.show()
@@ -115,13 +116,13 @@ def dm03_sns_stripplot():
 
     # 4. 统计正负样本长度的 散点分布
     # 训练集
-    # 参1: x轴标签,  参2: y轴标签,  参3: 数据集,  参4: 用于分组的字段(即: 不同组颜色不同)
-    sns.stripplot(x='label', y='sentence_length', data=train_data, hue='label')
+    # 参1: 分类列,  参2: 数值列,  参3: 数据集,  参4: 按指定变量分组上色
+    sns.stripplot(x='label', y='sentence_length', data=train_data, hue='label', legend=False)
     plt.title('训练集正负样本长度散点分布')
     plt.show()
 
     # 测试集
-    sns.stripplot(x='label', y='sentence_length', data=dev_data)
+    sns.stripplot(x='label', y='sentence_length', data=dev_data, hue='label', legend=False)
     plt.title('测试集正负样本长度散点分布')
     plt.show()
 
@@ -134,12 +135,14 @@ def dm04_get_word_count():
     dev_data = pd.read_csv('./data/dev.tsv', sep='\t')
 
     # 2. 统计训练集的 词汇总数(去重后的).
-    train_vocab = set(chain(*map(lambda x: jieba.lcut(x), train_data['sentence'])))
+    # train_vocab = set(chain(*map(lambda x: jieba.lcut(x), train_data['sentence'])))
+    train_vocab = set(chain.from_iterable(map(lambda x: jieba.lcut(x), train_data["sentence"])))
     print(f'训练集共包含不同词汇总数为: {len(train_vocab)}')
 
 
     # 3. 统计测试集的 词汇总数(去重后的).
-    dev_vocab = set(chain(*map(lambda x: jieba.lcut(x), dev_data['sentence'])))
+    # dev_vocab = set(chain(*map(lambda x: jieba.lcut(x), dev_data['sentence'])))
+    dev_vocab = set(chain.from_iterable(map(lambda x: jieba.lcut(x), dev_data["sentence"])))
     print(f'测试集共包含不同词汇总数为: {len(dev_vocab)}')
 
 
@@ -169,7 +172,8 @@ def get_word_cloud(keywords_list):
     wordcloud = WordCloud(
         font_path='./data/SimHei.ttf',      # 字体路径
         max_words=100,                      # 最大显示数
-        background_color='white'            # 背景色
+        background_color='white',           # 背景色
+        random_state=42                     # 随机种子
     )
 
     # 2. 将关键词列表 -> 转换为 空格分割的字符串, 适配: 词云输入格式.
@@ -204,7 +208,7 @@ def dm05_word_cloud():
     get_word_cloud(p_a_train_vocab)
 
     # 分隔符
-    print(' =.= ' * 10)
+    print('-' * 30)
 
     # 场景2: 处理 训练集 -> 负样本
     # 2. 处理 训练集的 负样本(label=0) -> 生成词云.
@@ -214,6 +218,25 @@ def dm05_word_cloud():
     p_a_train_vocab = chain(*map(lambda x: get_a_list(x), p_train_data))
     # 2.3 调用词云函数, 根据形容词列表, 绘制词云.
     get_word_cloud(p_a_train_vocab)
+
+    # 验证集
+    dev_data = pd.read_csv(filepath_or_buffer='./data/dev.tsv', sep='\t')
+    # 获得验证集上正样本
+    p_valid_data = dev_data[dev_data["label"] == 1]["sentence"]
+
+    # 对正样本的每个句子的形容词
+    valid_p_a_vocab = chain(*map(lambda x: get_a_list(x), p_valid_data))
+    # print(train_p_n_vocab)
+
+    # 获得验证集上负样本
+    n_valid_data = dev_data[dev_data["label"] == 0]["sentence"]
+
+    # 获取负样本的每个句子的形容词
+    valid_n_a_vocab = chain(*map(lambda x: get_a_list(x), n_valid_data))
+
+    # 调用绘制词云函数
+    get_word_cloud(valid_p_a_vocab)
+    get_word_cloud(valid_n_a_vocab)
 
 
 
@@ -225,16 +248,16 @@ if __name__ == '__main__':
     dm01_label_sns_countplot()
 
     # 2. 测试: 训练集 和 测试集的 句子长度分布的 可视化统计.
-    # dm02_len_sns_distplot()
+    dm02_len_sns_distplot()
 
     # 3. 测试: 训练集 和 测试集的 正负样本长度散点分布.
-    # dm03_sns_stripplot()
+    dm03_sns_stripplot()
 
     # 4. 测试: 获取: 训练集和测试集的 词汇总数(去重后的).
-    # dm04_get_word_count()
+    dm04_get_word_count()
 
     # 5. 测试: 训练集和测试集的 高频形容词词云.
-    # dm05_word_cloud()
+    dm05_word_cloud()
 
 
 
