@@ -49,7 +49,7 @@ def dm_rnn_for_base():
 
     # 3. 初始化隐藏层(即: 上一时间步的隐藏状态)
     # 参1: 隐藏层的层数(即: 隐藏层层数 num_layers),  参2: 批次大小(batch_size),  参3: 隐藏层维度(即: 输出维度 hidden_size)
-    h0 = torch.randn(1, 3, 6)
+    h0 = torch.zeros(1, 3, 6)
 
     # 4. 运行RNN模型
     # 本次的输出, 本次的隐藏状态 = rnn(本次的输入, 上一时刻的隐藏状态)
@@ -80,7 +80,7 @@ def dm_rnn_for_sequence_len():
     output, hn = rnn(input, h0)
 
     # 5. 打印结果.
-    print(f'output: {output}, output.shape: {output.shape}')        # shape: (20, 3, 6)
+    print(f'output.shape: {output.shape}')        # shape: (20, 3, 6)
     print(f'hidden: {hn}, hidden.shape: {hn.shape}')                # shape: (1, 3, 6)
     print(f'rnn模型: {rnn}')                                         # RNN(5, 6)
 
@@ -114,10 +114,10 @@ def dm_rnn_for_hidden_layers():
 # todo 4.测试代码.
 if __name__ == '__main__':
     # 1. 测试 RNN基础版
-    # dm_rnn_for_base()
+    dm_rnn_for_base()
 
     # 2. 测试 RNN修改句子长度
-    # dm_rnn_for_sequence_len()
+    dm_rnn_for_sequence_len()
 
     # 3. 测试 RNN修改隐藏层层数
     dm_rnn_for_hidden_layers()
