@@ -80,7 +80,7 @@ def dm_rnn_for_sequence_len():
     output, hn = rnn(input, h0)
 
     # 5. 打印结果.
-    print(f'output.shape: {output.shape}')        # shape: (20, 3, 6)
+    print(f'output: {output}, output.shape: {output.shape}')        # shape: (20, 3, 6)
     print(f'hidden: {hn}, hidden.shape: {hn.shape}')                # shape: (1, 3, 6)
     print(f'rnn模型: {rnn}')                                         # RNN(5, 6)
 
