@@ -1,6 +1,10 @@
 """
 案例:
     演示 LogSoftmax()函数的用法
+
+用处:
+    nn.CrossEntropyLoss() 的计算公式为：\mathcal{L} = - \sum_{i=1}^{n} y_i \log(S(f_\theta(\mathbf{x}_i)))
+    当需要手动计算时，就可以使用 nn.LogSoftmax() 函数来计算 \log(S(f_\theta(\mathbf{x}_i))) 这一部分。
 """
 
 # 导包
@@ -28,3 +32,5 @@ print(f'softmax()计算结果: {softmax}')        # tensor([0.1300, 0.8690, 0.00
 # 3.2 手动计算log() -> 对softmax()结果, 取自然对数, 得到: 对数概率.
 log_softmax_probs = torch.log(softmax)
 print(f'计算结果(对数概率): {log_softmax_probs}')   # tensor([-2.0404, -0.1404, -6.9404])
+
+print(log_probs == log_softmax_probs)
