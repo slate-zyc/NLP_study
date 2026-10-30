@@ -5,6 +5,8 @@
 用处:
     nn.CrossEntropyLoss() 的计算公式为：\mathcal{L} = - \sum_{i=1}^{n} y_i \log(S(f_\theta(\mathbf{x}_i)))
     当需要手动计算时，就可以使用 nn.LogSoftmax() 函数来计算 \log(S(f_\theta(\mathbf{x}_i))) 这一部分。
+说明：
+    分类交叉熵损失函数CrossEntropyLoss(新版写法) = NLLLoss损失函数 + LogSoftmax(dim=-1)  旧版写法
 """
 
 # 导包
