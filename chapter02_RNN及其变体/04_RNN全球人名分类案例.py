@@ -18,6 +18,10 @@
     2. 本案例是(课程中, NLP阶段)为数不多的 用RNN, LSTM, GRU三种模型全演示的案例.
     3. 代码层次上, 优先掌握: LSTM, RNN, 因为GRU写法和RNN几乎一致, 简单改改即可.
 
+细节:
+    绘制图像时出现以下提示，需要将"E:\\conda-envs\\NLP-study\\Lib\\site-packages\\torch\\lib\\libiomp5md.dll"目录下的libiomp5md.dll文件删除
+    OMP: Error #15: Initializing libiomp5md.dll, but found libiomp5md.dll already initialized.
+注意：路径要用双斜杠，否则会被识别导致转译失败
 
 晚上练习顺序:
     1. 先用RNN模型把案例跑一版.
@@ -35,7 +39,8 @@
             1. CrossEntropyLoss 损失函数.
             2. 直接返回数据加载器...
             3. 把模型训练的损失, 时间, 正确率列表导出到文件中, 后续直接加载.
-            4. .......
+            4. 考虑处理分批训练
+            5. ......
 """
 
 # 导包
@@ -43,7 +48,7 @@ import torch                                        # 张量计算相关
 import torch.nn as nn                               # 神经网络模块, 各种模型的层, 组件...
 import torch.nn.functional as F                     # 常用的函数库...
 import torch.optim as optim                         # 优化器模块
-from  torch.utils.data import Dataset, DataLoader   # 数据集对象, 数据加载器
+from torch.utils.data import Dataset, DataLoader    # 数据集对象, 数据加载器
 import string                                       # 字符串处理模块.
 import time                                         # 时间模块.
 import matplotlib.pyplot as plt                     # 绘图模块.
@@ -70,8 +75,8 @@ categories = ['Italian', 'English', 'Arabic', 'Spanish', 'Scottish', 'Irish', 'C
 # 2. 国家名 个数.
 category_num = len(categories)
 
-print('国家名: ', categories)
-print('国家名种类数: ', category_num)         # 18个国家名
+# print('国家名: ', categories)
+# print('国家名种类数: ', category_num)         # 18个国家名
 
 
 # todo 3. 定义函数, 实现: 读取源数据到内存.
@@ -97,9 +102,9 @@ def read_data(file_path):
             my_list_x.append(x)
             my_list_y.append(y)
 
-    # 扩展: 查看下数据集的长度, 即: 判断数据是否正确.
-    print(f'my_list_x: {len(my_list_x)}')       # 20074
-    print(f'my_list_y: {len(my_list_y)}')       # 20074
+    # # 扩展: 查看下数据集的长度, 即: 判断数据是否正确.
+    # print(f'my_list_x: {len(my_list_x)}')       # 20074
+    # print(f'my_list_y: {len(my_list_y)}')       # 20074
 
     # 7. 返回解析后的 样本 和 标签.
     return my_list_x, my_list_y
@@ -160,6 +165,32 @@ def get_dataloader():
     # 3. 创建数据加载器对象, 用于批量加载和处理数据.
     # 参1: 数据集对象(20074个人名 和 国家名),  参2: 批次大小, 参3: 是否打乱数据(训练集打乱, 测试集不打乱)
     my_dataloader = DataLoader(name_class_dataset, batch_size=1, shuffle=True)
+    '''
+    # 优化：如果需要batch_size超过1，那么就需要批次内样本长度一样，所以需要补齐
+    import torch
+    from torch.nn.utils.rnn import pad_sequence
+
+    # 用 pad_sequence 把同一 batch 的姓名补齐到最大长度
+    def my_collate_fn(batch):
+        # batch 是 [(x1, y1), (x2, y2), ...]
+        xs, ys = zip(*batch)
+
+        # xs 中每个是 [seq_len_i, 57]
+        # pad_sequence 默认在 dim=0 补齐，batch_first=True 得到 [B, max_len, 57]
+        xs = pad_sequence(xs, batch_first=True, padding_value=0)
+
+        # y 如果是标量张量
+        ys = torch.stack(ys, dim=0)
+
+        return xs, ys
+
+    my_dataloader = DataLoader(
+        name_class_dataset,
+        batch_size=3,
+        shuffle=True,
+        collate_fn=my_collate_fn
+    )
+    '''
 
     # 4. 测试数据加载器, 打印第一批数据(某一个样本的) 形状 和 内容
     for x, y in my_dataloader:
@@ -195,7 +226,7 @@ class My_RNN(nn.Module):
 
         # 1.8 定义激活函数, 将输出类别 -> 类别的概率分布.
         # 大白话解释: 多分类交叉熵损失函数CrossEntropyLoss(新版写法) = NLLLoss损失函数 + LogSoftmax(dim=-1)  旧版写法
-        self.softmax = nn.LogSoftmax(dim=-1)        # 优化2: 如果用CrossEntropyLoss损失函数, 这行代码可以省略不写.
+        self.logsoftmax = nn.LogSoftmax(dim=-1)        # 优化2: 如果用CrossEntropyLoss损失函数, 这行代码可以省略不写.
 
 
     # 2. 前向传播函数.
@@ -214,7 +245,7 @@ class My_RNN(nn.Module):
         tmp_output = self.linear(tmp_output)
 
         # 2.5 数据通过激活函数, 映射到概率分布, 并返回.
-        return self.softmax(tmp_output), hn
+        return self.logsoftmax(tmp_output), hn
 
 
     # 3. 初始化隐藏状态, 创建全0的初始化隐藏状态.
@@ -246,7 +277,7 @@ class My_LSTM(nn.Module):
 
         # 1.8 定义激活函数, 将输出类别 -> 类别的概率分布.
         # 大白话解释: 多分类交叉熵损失函数CrossEntropyLoss(新版写法) = NLLLoss损失函数 + LogSoftmax(dim=-1)  旧版写法
-        self.softmax = nn.LogSoftmax(dim=-1)        # 优化2: 如果用CrossEntropyLoss损失函数, 这行代码可以省略不写.
+        self.logsoftmax = nn.LogSoftmax(dim=-1)        # 优化2: 如果用CrossEntropyLoss损失函数, 这行代码可以省略不写.
 
 
     # 2. 前向传播函数.
@@ -268,7 +299,7 @@ class My_LSTM(nn.Module):
         # 返回值1: 预测的类别概率分布, 形状: [batch_size, output_size]
         # 返回值2: (最后一个时间步的)隐藏状态张量, 形状: [n_layers, batch_size, hidden_size]
         # 返回值3: (最后一个时间步的)细胞状态张量, 形状: [n_layers, batch_size, hidden_size]
-        return self.softmax(tmp_output), hn, cn
+        return self.logsoftmax(tmp_output), hn, cn
 
 
     # 3. 初始化隐藏状态, 创建全0的初始化隐藏状态.
@@ -302,7 +333,7 @@ class My_GRU(nn.Module):
 
         # 1.8 定义激活函数, 将输出类别 -> 类别的概率分布.
         # 大白话解释: 多分类交叉熵损失函数CrossEntropyLoss(新版写法) = NLLLoss损失函数 + LogSoftmax(dim=-1)  旧版写法
-        self.softmax = nn.LogSoftmax(dim=-1)        # 优化2: 如果用CrossEntropyLoss损失函数, 这行代码可以省略不写.
+        self.logsoftmax = nn.LogSoftmax(dim=-1)        # 优化2: 如果用CrossEntropyLoss损失函数, 这行代码可以省略不写.
 
 
     # 2. 前向传播函数.
@@ -321,7 +352,7 @@ class My_GRU(nn.Module):
         tmp_output = self.linear(tmp_output)
 
         # 2.5 数据通过激活函数, 映射到概率分布, 并返回.
-        return self.softmax(tmp_output), hn
+        return self.logsoftmax(tmp_output), hn
 
 
     # 3. 初始化隐藏状态, 创建全0的初始化隐藏状态.
@@ -335,7 +366,7 @@ class My_GRU(nn.Module):
 def dm_test_myrnn():
     # 1. 实例化RNN对象
     my_rnn = My_RNN(57, 128, 18)
-    # print(f'my_rnn: {my_rnn}')      # my_rnn: My_RNN( (rnn): RNN(57, 128) (linear): Linear(in_features=128, out_features=18, bias=True) (softmax): LogSoftmax(dim=-1) )
+    print(f'my_rnn: {my_rnn}')      # my_rnn: My_RNN( (rnn): RNN(57, 128) (linear): Linear(in_features=128, out_features=18, bias=True) (softmax): LogSoftmax(dim=-1) )
 
     # 2. 准备测试数据, 创建1个随机张量, 模拟输入, 形状为: [seq_len人名长度, input_size词向量维度]
     input = torch.randn(6, 57)      # liru: ouyang 欧阳
@@ -349,9 +380,16 @@ def dm_test_myrnn():
     output, hn = my_rnn(input, h0)
 
     # 5. 打印结果.
-    print(f'输出的形状: {output.shape}, 输出的内容: {output}')         # [1, 18]
-    print(f'隐藏状态的形状: {hn.shape}, 隐藏状态的内容: {hn}')          #  [1, 1, 128]
+    print(f'实列化之后输出的形状: {output.shape}, \n输出的内容: {output}')        # [1, 18]
+    # print(f'隐藏状态的形状: {hn.shape}, 隐藏状态的内容: {hn}')                   # [1, 1, 128]
 
+    # # 给模型1个字符1个字符的喂数据
+    # hidden = my_rnn.init_hidden()
+    # for i in range(input.shape[0]):
+    #     tmp_input = input[i].unsqueeze(0)
+    #     output, hidden = my_rnn(tmp_input, hidden)      # 前后都要用hidden命名保证循环
+    # # 最后一次ouput
+    # print('一个字符一个字符的送数据: output-->', output.shape, output)
 
 # todo 7.2 测试RNN, LSTM, GRU网络模型
 def dm_test_rnn_lstm_gru():
@@ -403,6 +441,7 @@ def dm_test_rnn_lstm_gru():
         hidden, c = my_lstm.init_hidden()  # 形状: [1, 1, 128]
 
         # 7.3 前向传播.
+        # 不能以元组形式，因为my_lstm是实例化的，所以要和forward方法保持一致
         output, hidden, c = my_lstm(x[0], hidden, c)  # x[0] 等价于: [10, 57]
         print(f'LSTM输出形状: {output.shape}, 预测结果: {output}')
 
@@ -452,13 +491,15 @@ def train_rnn():
     criterion = nn.NLLLoss()    # 如果你用了CrossEntropyLoss(), 则它 = NLLLoss() + LogSoftmax()
     optimizer = optim.Adam(my_rnn.parameters(), lr=my_lr)
 
+    my_rnn.train()
+
     # 3. 训练过程 -> 参数初始化
     start_time = time.time()        # 模型开始训练时间.
     total_iter_num = 0              # 已训练的样本数.
     total_loss = 0.0                # 已训练的损失和
-    total_loss_list = []            # 每100个样本求一次平均损失, 形成: 损失列表.
+    total_loss_list = []            # 每100个样本求一次累计平均损失, 形成: 累计损失列表.
     total_acc_num = 0               # 已训练的样本, 预测准确总数
-    total_acc_list = []             # 每100个样本求一次平均准确率, 形成: 准确率列表.
+    total_acc_list = []             # 每100个样本求一次累计平均准确率, 形成: 累计准确率列表.
 
     # 4. 具体的训练过程, 按轮数遍历数据集.
     for epoch in range(epochs):     # epoch: 第几轮
@@ -484,36 +525,38 @@ def train_rnn():
             pred_tag = torch.argmax(output).item()
             total_acc_num += (1 if pred_tag == y else 0)        # 统计: 预测正确的样本数
 
-            # 4.8 统计: 每100个样本求一次平均损失, 准确率 形成: 损失列表, 准确率列表.
+            # 4.8 统计: 每100个样本求一次累计平均损失, 累计准确率 形成: 累计平均损失列表, 累计准确率列表.
             if total_iter_num % 100 == 0:
-                # 走这里, 说明100步了, 计算: 平均损失.
+                # 走这里, 说明100步了, 计算: 累计平均损失.
                 avg_loss = total_loss / total_iter_num      # 总损失 / 总样本数
-                # 把上述的平均损失, 添加到: 损失列表.
+                # 把上述的累计平均损失, 添加到: 损失列表.
                 total_loss_list.append(avg_loss)
 
-                # 计算准确率, 即: 预测正确的 / 总样本数, 并添加到: 准确率列表.
+                # 计算累计准确率, 即: 预测正确的 / 总样本数, 并添加到: 累计准确率列表.
                 avg_acc = total_acc_num / total_iter_num
                 total_acc_list.append(avg_acc)
 
             # 4.9 每2000步(个样本), 打印训练日志.
             if total_iter_num % 2000 == 0:
-                # 计算平均损失.
                 avg_loss = total_loss / total_iter_num
-                # 计算模型训练耗时
-                end_time = int(time.time() - start_time)
-                # 输出训练日志.
-                print(f'轮次: {epoch + 1}, 训练的样本数: {total_iter_num}, 平均损失: {avg_loss:.4f}, 耗时: {end_time}s, 准确率: {avg_acc:.4f}')
+                avg_acc = total_acc_num / total_iter_num
+                print(
+                    f'轮次: {epoch + 1}, '
+                    f'累计训练样本数: {total_iter_num}, '
+                    f'累计平均损失: {avg_loss:.4f}, '
+                    f'累计耗时: {time.time() - start_time:.2f}s, '
+                    f'累计准确率: {avg_acc:.4f}'
+                )
 
-        # 4.10 走到这里, 说明一轮训练完毕 -> 保存模型.
-        torch.save(my_rnn.state_dict(), f'./model/my_rnn_wh02_{epoch + 1}.bin')
+        # 4.10 走到这里, 说明一轮训练完毕 -> 保存模型.（为了备份）
+        torch.save(my_rnn.state_dict(), f'./model/my_rnn_model_{epoch + 1}epoch.bin')
 
     # 5. 走到这里, 训练结束, 返回统计结果.
-    total_time = int(time.time() - start_time)
-    print(f'训练完成, 总耗时: {total_time}s, 总训练了 {total_iter_num}个样本!!')
+    total_time = round(time.time() - start_time, 2)
+    print(f'训练完成, 总耗时: {total_time}s, 总训练了 {total_iter_num} 个样本!!')
 
     # 6. 优化4: 你可以把下述返回的三个值(损失列表, 训练总耗时, 准确率列表), 存储到文件中.
-    #          因为一会儿我们会 可视化3个模型的训练结果, 如果没有存储的话, 会把 训练动作从新跑一次.
-
+    #          因为一会儿会 可视化3个模型的训练结果, 如果没有存储的话, 会把 训练动作从新跑一次.
 
     # 7. 返回结果: 损失列表, 训练总耗时, 准确率列表.
     return total_loss_list, total_time, total_acc_list
@@ -539,13 +582,15 @@ def train_lstm():
     criterion = nn.NLLLoss()    # 如果你用了CrossEntropyLoss(), 则它 = NLLLoss() + LogSoftmax()
     optimizer = optim.Adam(my_rnn.parameters(), lr=my_lr)
 
+    my_rnn.train()
+
     # 3. 训练过程 -> 参数初始化
     start_time = time.time()        # 模型开始训练时间.
     total_iter_num = 0              # 已训练的样本数.
     total_loss = 0.0                # 已训练的损失和
-    total_loss_list = []            # 每100个样本求一次平均损失, 形成: 损失列表.
+    total_loss_list = []            # 每100个样本求一次累计平均损失, 形成: 累计损失列表.
     total_acc_num = 0               # 已训练的样本, 预测准确总数
-    total_acc_list = []             # 每100个样本求一次平均准确率, 形成: 准确率列表.
+    total_acc_list = []             # 每100个样本求一次累计平均准确率, 形成: 累计准确率列表.
 
     # 4. 具体的训练过程, 按轮数遍历数据集.
     for epoch in range(epochs):     # epoch: 第几轮
@@ -572,36 +617,38 @@ def train_lstm():
             pred_tag = torch.argmax(output).item()
             total_acc_num += (1 if pred_tag == y else 0)        # 统计: 预测正确的样本数
 
-            # 4.8 统计: 每100个样本求一次平均损失, 准确率 形成: 损失列表, 准确率列表.
+            # 4.8 统计: 每100个样本求一次累计平均损失, 累计准确率 形成: 累计平均损失列表, 累计准确率列表.
             if total_iter_num % 100 == 0:
-                # 走这里, 说明100步了, 计算: 平均损失.
+                # 走这里, 说明100步了, 计算: 累计平均损失.
                 avg_loss = total_loss / total_iter_num      # 总损失 / 总样本数
-                # 把上述的平均损失, 添加到: 损失列表.
+                # 把上述的累计平均损失, 添加到: 损失列表.
                 total_loss_list.append(avg_loss)
 
-                # 计算准确率, 即: 预测正确的 / 总样本数, 并添加到: 准确率列表.
+                # 计算累计准确率, 即: 预测正确的 / 总样本数, 并添加到: 累计准确率列表.
                 avg_acc = total_acc_num / total_iter_num
                 total_acc_list.append(avg_acc)
 
             # 4.9 每2000步(个样本), 打印训练日志.
             if total_iter_num % 2000 == 0:
-                # 计算平均损失.
                 avg_loss = total_loss / total_iter_num
-                # 计算模型训练耗时
-                end_time = int(time.time() - start_time)
-                # 输出训练日志.
-                print(f'轮次: {epoch + 1}, 训练的样本数: {total_iter_num}, 平均损失: {avg_loss:.4f}, 耗时: {end_time}s, 准确率: {avg_acc:.4f}')
+                avg_acc = total_acc_num / total_iter_num
+                print(
+                    f'轮次: {epoch + 1}, '
+                    f'累计训练样本数: {total_iter_num}, '
+                    f'累计平均损失: {avg_loss:.4f}, '
+                    f'累计耗时: {time.time() - start_time:.2f}s, '
+                    f'累计准确率: {avg_acc:.4f}'
+                )
 
-        # 4.10 走到这里, 说明一轮训练完毕 -> 保存模型.
-        torch.save(my_rnn.state_dict(), f'./model/my_lstm_wh02_{epoch + 1}.bin')
+        # 4.10 走到这里, 说明一轮训练完毕 -> 保存模型.（为了备份）
+        torch.save(my_rnn.state_dict(), f'./model/my_lstm_model_{epoch + 1}epoch.bin')
 
     # 5. 走到这里, 训练结束, 返回统计结果.
-    total_time = int(time.time() - start_time)
-    print(f'训练完成, 总耗时: {total_time}s, 总训练了 {total_iter_num}个样本!!')
+    total_time = round(time.time() - start_time, 2)
+    print(f'训练完成, 总耗时: {total_time}s, 总训练了 {total_iter_num} 个样本!!')
 
     # 6. 优化4: 你可以把下述返回的三个值(损失列表, 训练总耗时, 准确率列表), 存储到文件中.
-    #          因为一会儿我们会 可视化3个模型的训练结果, 如果没有存储的话, 会把 训练动作从新跑一次.
-
+    #          因为一会儿会 可视化3个模型的训练结果, 如果没有存储的话, 会把 训练动作从新跑一次.
 
     # 7. 返回结果: 损失列表, 训练总耗时, 准确率列表.
     return total_loss_list, total_time, total_acc_list
@@ -627,13 +674,15 @@ def train_gru():
     criterion = nn.NLLLoss()    # 如果你用了CrossEntropyLoss(), 则它 = NLLLoss() + LogSoftmax()
     optimizer = optim.Adam(my_rnn.parameters(), lr=my_lr)
 
+    my_rnn.train()
+
     # 3. 训练过程 -> 参数初始化
     start_time = time.time()        # 模型开始训练时间.
     total_iter_num = 0              # 已训练的样本数.
     total_loss = 0.0                # 已训练的损失和
-    total_loss_list = []            # 每100个样本求一次平均损失, 形成: 损失列表.
+    total_loss_list = []            # 每100个样本求一次累计平均损失, 形成: 累计损失列表.
     total_acc_num = 0               # 已训练的样本, 预测准确总数
-    total_acc_list = []             # 每100个样本求一次平均准确率, 形成: 准确率列表.
+    total_acc_list = []             # 每100个样本求一次累计平均准确率, 形成: 累计准确率列表.
 
     # 4. 具体的训练过程, 按轮数遍历数据集.
     for epoch in range(epochs):     # epoch: 第几轮
@@ -659,42 +708,43 @@ def train_gru():
             pred_tag = torch.argmax(output).item()
             total_acc_num += (1 if pred_tag == y else 0)        # 统计: 预测正确的样本数
 
-            # 4.8 统计: 每100个样本求一次平均损失, 准确率 形成: 损失列表, 准确率列表.
+            # 4.8 统计: 每100个样本求一次累计平均损失, 累计准确率 形成: 累计平均损失列表, 累计准确率列表.
             if total_iter_num % 100 == 0:
-                # 走这里, 说明100步了, 计算: 平均损失.
+                # 走这里, 说明100步了, 计算: 累计平均损失.
                 avg_loss = total_loss / total_iter_num      # 总损失 / 总样本数
-                # 把上述的平均损失, 添加到: 损失列表.
+                # 把上述的累计平均损失, 添加到: 损失列表.
                 total_loss_list.append(avg_loss)
 
-                # 计算准确率, 即: 预测正确的 / 总样本数, 并添加到: 准确率列表.
+                # 计算累计准确率, 即: 预测正确的 / 总样本数, 并添加到: 累计准确率列表.
                 avg_acc = total_acc_num / total_iter_num
                 total_acc_list.append(avg_acc)
 
             # 4.9 每2000步(个样本), 打印训练日志.
             if total_iter_num % 2000 == 0:
-                # 计算平均损失.
                 avg_loss = total_loss / total_iter_num
-                # 计算模型训练耗时
-                end_time = int(time.time() - start_time)
-                # 输出训练日志.
-                print(f'轮次: {epoch + 1}, 训练的样本数: {total_iter_num}, 平均损失: {avg_loss:.4f}, 耗时: {end_time}s, 准确率: {avg_acc:.4f}')
+                avg_acc = total_acc_num / total_iter_num
+                print(
+                    f'轮次: {epoch + 1}, '
+                    f'累计训练样本数: {total_iter_num}, '
+                    f'累计平均损失: {avg_loss:.4f}, '
+                    f'累计耗时: {time.time() - start_time:.2f}s, '
+                    f'累计准确率: {avg_acc:.4f}'
+                )
 
-        # 4.10 走到这里, 说明一轮训练完毕 -> 保存模型.
-        torch.save(my_rnn.state_dict(), f'./model/my_gru_wh02_{epoch + 1}.bin')
+        # 4.10 走到这里, 说明一轮训练完毕 -> 保存模型.（为了备份）
+        torch.save(my_rnn.state_dict(), f'./model/my_gru_model_{epoch + 1}epoch.bin')
 
     # 5. 走到这里, 训练结束, 返回统计结果.
-    total_time = int(time.time() - start_time)
-    print(f'训练完成, 总耗时: {total_time}s, 总训练了 {total_iter_num}个样本!!')
+    total_time = round(time.time() - start_time, 2)
+    print(f'训练完成, 总耗时: {total_time}s, 总训练了 {total_iter_num} 个样本!!')
 
     # 6. 优化4: 你可以把下述返回的三个值(损失列表, 训练总耗时, 准确率列表), 存储到文件中.
-    #          因为一会儿我们会 可视化3个模型的训练结果, 如果没有存储的话, 会把 训练动作从新跑一次.
-
+    #          因为一会儿会 可视化3个模型的训练结果, 如果没有存储的话, 会把 训练动作从新跑一次.
 
     # 7. 返回结果: 损失列表, 训练总耗时, 准确率列表.
     return total_loss_list, total_time, total_acc_list
 
 
-# (作业)
 # todo 9. 模型训练绘图 -> 这个函数的可视化代码你可以不写, 但是模型训练等代码要写出来, 出3张图.
 def dm_test_train_rnn_lstm_gru():
     # 1. 训练3种模型, 并获取性能指标.
@@ -705,7 +755,7 @@ def dm_test_train_rnn_lstm_gru():
 
     # 2. 绘制 损失对比曲线(评估: 模型收敛速度)
     # 2.1 创建画布.     0: 图1
-    plt.figure(0, figsize=(10, 5))
+    plt.figure(0)
     # 2.2 绘制各模型损失曲线.
     plt.plot(total_loss_list_rnn, label='RNN')
     plt.plot(total_loss_list_lstm, label='LSTM')
@@ -715,14 +765,14 @@ def dm_test_train_rnn_lstm_gru():
     plt.xlabel('训练步数(每100步)')
     plt.ylabel('平均损失值')
     plt.grid(True, linestyle='--', alpha=0.7)
-    plt.legend(loc='upper left')
+    plt.legend(loc='upper right')
     plt.savefig('./img/RNN_LSTM_GRU_loss_time.png')
     plt.show()
 
 
     # 3. 绘制 训练耗时对比柱状图(评估: 模型计算效率)
     # 3.1 创建画布,     1: 图2
-    plt.figure(1, figsize=(10, 5))
+    plt.figure(1)
     # 3.2 准备x轴 和 y轴标签内容.
     x_data = ['RNN', 'LSTM', 'GRU']
     y_data = [total_time_rnn, total_time_lstm, total_time_gru]
@@ -738,7 +788,7 @@ def dm_test_train_rnn_lstm_gru():
 
     # 4. 绘制 训练准确率对比曲线(评估: 模型效果)
     # 4.1 创建画布.     2: 图3
-    plt.figure(2, figsize=(10, 5))
+    plt.figure(2)
     # 4.2 绘制各模型准确率曲线.
     plt.plot(total_acc_list_rnn, label='RNN', color='red')
     plt.plot(total_acc_list_lstm, label='LSTM', color='green')
@@ -753,9 +803,9 @@ def dm_test_train_rnn_lstm_gru():
 # todo 10. 模型预测.
 # todo 10.1 RNN模型预测
 # todo 10.1.1. 定义遍历, 记录模型的参数的路径.
-my_rnn_path = './model/my_rnn_wh02_1.bin'
-my_lstm_path = './model/my_lstm_wh02_1.bin'
-my_gru_path = './model/my_gru_wh02_1.bin'
+my_rnn_path = './model/my_rnn_model_1epoch.bin'
+my_lstm_path = './model/my_lstm_model_1epoch.bin'
+my_gru_path = './model/my_gru_model_1epoch.bin'
 
 # todo 10.1.2 定义函数, 将要预测的人名 转成 one-hot编码, 例如: 'zhang' -> [5, 57]
 def lineToTensor(line):
@@ -793,26 +843,63 @@ def dm_predict_rnn(x):
         # 参3(largest): 获取概率最大的元素.
         topv, topi = output.topk(3, 1, True)
         # 5.3 打印待预测文本.
-        print(f'rnn(待预测文本): {x}')
+        print(f'RNN(待预测文本) => {x}')
 
         # 5.4 解析预测结果.
         for i in range(3):
             value = topv[0][i].item()           # 概率值 -> Python的标量
             category_idx  = topi[0][i].item()   # 类别索引
             category = categories[category_idx] # 类别名称.
-            print(f'value: {value}, category: {category}')
-
+            print(f'\tvalue: {value:.5f}  category: {category}')
 
 
 # todo 10.2 LSTM模型预测(自己写)
+def dm_predict_lstm(x):
+    n_letters, n_hidden, n_categories = 57, 128, 18
+    x_tensor = lineToTensor(x)
+    my_lstm = My_LSTM(n_letters, n_hidden, n_categories)
+    my_lstm.load_state_dict(torch.load(my_lstm_path))
+
+    with torch.no_grad():
+        hidden, c = my_lstm.init_hidden()
+        output, hidden, c = my_lstm(x_tensor, hidden, c)
+        topv, topi = output.topk(3, 1, True)
+        print(f'LSTM(待预测文本) => {x}')
+
+    for i in range(3):
+        value = topv[0][i].item()
+        category_idx = topi[0][i].item()
+        category = categories[category_idx]
+        print(f'\tvalue: {value:.5f}  category: {category}')
 
 
 # todo 10.3 GRU模型预测(自己写)
+def dm_predict_gru(x):
+    n_letters, n_hidden, n_categories = 57, 128, 18
+    x_tensor = lineToTensor(x)
+    my_gru = My_GRU(n_letters, n_hidden, n_categories)
+    my_gru.load_state_dict(torch.load(my_gru_path))
+
+    with torch.no_grad():
+        output, hidden = my_gru(x_tensor, my_gru.init_hidden())
+        topv, topi = output.topk(3, 1, True)
+        print(f'GRU(待预测文本) => {x}')
+
+    for i in range(3):
+        value = topv[0][i].item()
+        category_idx = topi[0][i].item()
+        category = categories[category_idx]
+        print(f'\tvalue: {value:.5f}  category: {category}')
 
 
+# todo 10.4 把三个函数的入口地址 组成列表，统一输入数据进行测试
+def dm_test_predict_rnn_lstm_gru(x):
+    for func in [dm_predict_rnn, dm_predict_lstm, dm_predict_gru]:
+        func(x)
 
 # todo n. 测试代码
 if __name__ == '__main__':
+    torch.manual_seed(123)
     # 1. 读取数据
     # my_list_x, my_list_y = read_data('./data/name_classfication.txt')
 
@@ -830,8 +917,8 @@ if __name__ == '__main__':
     # train_lstm()        # 训练完成, 总耗时: 48s, 总训练了 20074个样本!!
     # train_gru()         # 训练完成, 总耗时: 78s, 总训练了 20074个样本!!
 
-    # 6. 测试: 模型训练绘图(即: 效果对比)
+    # 6. 测试: 模型训练并绘图(即: 效果对比)
     # dm_test_train_rnn_lstm_gru()
 
     # 7. 测试: 模型预测.
-    dm_predict_rnn('Piao')
+    dm_test_predict_rnn_lstm_gru('Zhang')
