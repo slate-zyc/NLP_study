@@ -56,7 +56,7 @@ EOS_token = 1       # end of  sentence
 # 最大句子长度不能超过10(包括标点)
 MAX_LENGTH = 10
 # 数据文件的路径
-data_path = './data/eng-fra-v2.txt'
+data_path = 'data/eng-fra.txt'
 
 
 # todo 2.定义数据清洗函数 -> 即: 字符串规范化处理函数, 用于: 文本预处理.
@@ -96,14 +96,14 @@ def my_getdata():
         # 2. 清洗文本并构建双语 句子树(句子对).
         # for line in lines:         获取到每行数据,     例如: 'i m tired .	je suis fatigue !'
         # for s in line.split('\t'): 每行数据按照\t切割, 例如: ['i m tired .', 'je suis fatigue !']
-        my_pairs = [ [normalizeString(s) for s in line.split('\t')] for line in lines]
+        my_pairs = [[normalizeString(s) for s in line.split('\t')] for line in lines]
         # print(len(my_pairs))        # 句子总对数: 63594
 
         # 3. 数据探查: 查看部分样本数据.
         # # 3.1 打印前5条双语句子对, 直观查看数据格式.
         # print(f'my_pairs: {my_pairs[:5]}')
         #
-        # # 3.2 打印第7000条双语句子对, 查看特定位置的数据.
+        # # 3.2 打印第7001条双语句子对, 查看特定位置的数据.
         # print(f'my_pairs[7000]: {my_pairs[7000]}')
         # print(f'my_pairs[7000](英文): {my_pairs[7000][0]}')
         # print(f'my_pairs[7000](法文): {my_pairs[7000][1]}')
@@ -182,12 +182,14 @@ class MyPairsDataset(Dataset):
         # 3.1 按空格分割单词, 获取每个单词的索引.
         x = [english_word2index[word] for word in x.split(' ')]
         # 3.2 在句子末尾添加结束标记EOS
+        # x.insert(0, SOS_token)
         x.append(EOS_token)
         # 3.3 将句子转换成张量, 并指定设备(CPU 或者 GPU)
         tensor_x = torch.tensor(x, dtype=torch.long, device=device)
 
         # 4. 法语句子文本转数值.
         y = [french_word2index[word] for word in y.split(' ')]
+        # y.insert(0, SOS_token)
         y.append(EOS_token)
         tensor_y = torch.tensor(y, dtype=torch.long, device=device)
 
@@ -204,16 +206,16 @@ def get_dataloader():
     # 参1: 数据集对象.  参2: 批次大小.  参3: 是否打乱数据(训练集打乱, 测试集不打乱).
     my_dataloader = DataLoader(my_dataset, batch_size=1, shuffle=True)
 
-    # 3. 测试数据加载器 -> 仅显示第1批数据.
+    # # 3. 测试数据加载器 -> 仅显示第1批数据.
     # for i, (x, y) in enumerate(my_dataloader):
-        # 4. 打印英文句子相关信息.
-        # print(f'x: {x.shape}, {x}')
-
-        # 5. 打印法语句子相关信息.
-        # print(f'y: {y.shape}, {y}')
-
-        # 6. 测试结束 -> 只显示一批数据即可.
-        # break
+    #     # 4. 打印英文句子相关信息.
+    #     print(f'x: {x.shape}, {x}')
+    #
+    #     # 5. 打印法语句子相关信息.
+    #     print(f'y: {y.shape}, {y}')
+    #
+    #     # 6. 测试结束 -> 只显示一批数据即可.
+    #     break
 
     # 7. 返回数据加载器对象.
     return my_dataloader
@@ -293,6 +295,7 @@ def dm_test_encoder():
 
     # 3. 创建编码器模型对象.
     my_encoder_gru = EncoderRNN(input_size=vocab_size, hidden_size=hidden_size)
+    print('my_encoderrnn模型结构-->', my_encoder_gru)
 
     # 4. (选做: CPU版可以不做) 将模型移动到指定的设备.
     my_encoder_gru = my_encoder_gru.to(device)
@@ -301,6 +304,7 @@ def dm_test_encoder():
     for i, (x, y) in enumerate(my_dataloader):
         # 5.1 打印输入英文句子索引张量 和 输入张量的形状.
         print(f'x: {x.shape}, {x}')     # x: torch.Size([1, 6]), tensor([14, 15, 43, 139, 888, 1])
+        print(f'y: {y.shape}, {y}')
 
         # 5.2 获取编码器的初始隐藏状态.
         h0 = my_encoder_gru.init_hidden()
@@ -309,10 +313,13 @@ def dm_test_encoder():
         output, hn = my_encoder_gru(x, h0)
 
         # 5.4 打印输出结果形状.
-        print(f'output: {output.shape}')    # torch.Size([1, 6, 256])
+        print(f'output: {output.shape}, {output}')    # torch.Size([1, 6, 256])
 
         # 5.5 打印隐藏状态的形状.
-        print(f'hidden: {hn.shape}')        # torch.Size([1, 1, 256])
+        print(f'hidden: {hn.shape}, {hn}')        # torch.Size([1, 1, 256])
+
+        print(output[0][-1] == hn[0])
+
         break       # 只看一组, 实际开发, 千万不要写.
 
 
@@ -330,7 +337,7 @@ class DecoderRNN(nn.Module):
         # 2. 保存输入参数.
         self.output_size = output_size
         self.hidden_size = hidden_size
-        # 3. 创建词嵌入层, 输入: [batch_size, seq_len], 输出: [batch_size, seq_len, hidden_size]
+        # 3. 创建词嵌入层, 输入: [batch_size, 1], 输出: [batch_size, 1, hidden_size]
         self.embedding = nn.Embedding(output_size, hidden_size)
         # 4. 创建GRU层.
         self.gru = nn.GRU(hidden_size, hidden_size, batch_first=True)
@@ -390,26 +397,27 @@ def dm_test_decoder():
         h0 = my_encoder_gru.init_hidden()
         # 4.3.2 (编码器)前向传播.
         encoder_output_c, hidden = my_encoder_gru(x, h0)
-        # print(f'编码器输出: {encoder_output_c.shape}')       # 编码器输出: torch.Size([1, 6, 256])
+        print(f'编码器输出: {encoder_output_c.shape}')       # 编码器输出: torch.Size([1, 6, 256])
 
         # 4.4 解码过程: 将隐藏状态解码为法语句子.
-        # print(f'观察: 最后1个时间步的output输出: {encoder_output_c[0][-1].shape}') # [6, 256] -> [256]
+        print(f'观察: 最后1个时间步的output输出: {encoder_output_c[0][-1].shape}') # [6, 256] -> [256]
 
         # 4.4.1 具体的解码过程 -> 逐个字符生成, 将隐藏状态解码为法语句子.
         # 遍历目标句子(法语句子)的每个时间步.
         for i in range(y.shape[1]):
             # 4.4.2 提取当前时间步的 目标词索引.
-            # y[0][i]:     取出batch中第1个样本的第i个词的索引.
+            # y[0][i]:     取出batch中第1个样本的第i个词的索引，为标量，标量是 0 维的
             # view(1, -1): 将标量转为[1, 1]的形状, 匹配: 解码器输入要求.
             tmp = y[0][i].view(1, -1)
             # 4.4.3 解码器的前向传播.
+
             output, hidden = my_decoder_gru(tmp, hidden)
             # 4.4.4 打印解码器的输出信息.
             # print(f'output每个时间步解析出来的概率分布: {output.size()}, {output.shape}')
-            print(f'第 {i + 1} 个法语单词的预测概率分布: {output.shape}, {output.shape}')
+            print(f'第 {i + 1} 个法语单词的预测概率分布: {output.shape}')
 
         print('\n' * 5)
-
+        break
 
 # todo 10. 构建基于GRU的解码器 -> 测试版本2: 带Attention(注意力机制)
 class AttnDecoderRNN(nn.Module):
@@ -427,9 +435,9 @@ class AttnDecoderRNN(nn.Module):
         # 输入形状: [batch_size, seq_len] -> [1, 1]
         # 输出形状: [batch_size, seq_len, hidden_size] -> [1, 1, 256]
         self.embedding = nn.Embedding(self.output_size, self.hidden_size)
-        # 4. 注意力权重计算层: 计算查询向量 和 编码器输出的匹配程度.
+        # 4. 注意力得分计算层: 计算查询向量 和 编码器输出的匹配程度.
         # 参1: 拼接后的查询向量 和 隐藏状态 -> [1, 1, 512]
-        # 参2: 注意力的权重分布 -> [1, 1, 10]  (最大)10个词
+        # 参2: 注意力的得分分布 -> [1, 1, 10]  (最大)10个词
         self.attn = nn.Linear(self.hidden_size * 2, self.max_length)
 
         # 5. 注意力融合层, 将 词嵌入 和 注意力权重进行融合.
@@ -861,7 +869,9 @@ if __name__ == '__main__':
     # normalizeString(s)
 
     # 2. 测试数据预处理函数.
-    # english_word2index, english_index2word, english_word_n, french_word2index, french_index2word, french_word_n, my_pairs = my_getdata()
+    # english_word2index, english_index2word, english_word_n, \
+    #     french_word2index, french_index2word, french_word_n, \
+    #     my_pairs = my_getdata()
     # print(f'英语词汇表映射: {english_word2index}')
     # print(f'英语单词反向映射: {english_index2word}')
     # print(f'英语词汇表大小: {english_word_n}')
@@ -877,7 +887,7 @@ if __name__ == '__main__':
     # dm_test_encoder()
 
     # 5. 测试基于GRU的解码器 -> 测试版本1: 无Attention(注意力机制)
-    # dm_test_decoder()
+    dm_test_decoder()
 
     # 6. 测试基于GRU的解码器 -> 测试版本2: 带Attention(注意力机制)
     # dm_test_attn_decoder()
@@ -889,4 +899,4 @@ if __name__ == '__main__':
     # dm_test_seq2seq_evaluate()
 
     # 9. 绘制注意力图.
-    dm_test_attention()
+    # dm_test_attention()
