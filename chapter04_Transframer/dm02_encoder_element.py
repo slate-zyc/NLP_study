@@ -24,6 +24,7 @@ import numpy as np
 import math
 import copy
 import matplotlib.pyplot as plt
+
 from dm01_input import *
 
 
@@ -40,9 +41,9 @@ def dm01_test_triu():
 
     # 2. 分别测试: k=0, k=1, k=-1的情况.
     print(np.triu(arr, k=0))
-    print(' -.- ' * 10)
+    print('-' * 30)
     print(np.triu(arr, k=1))  # 对角线
-    print(' -.- ' * 10)
+    print('-' * 30)
     print(np.triu(arr, k=-1))
 
 
@@ -50,7 +51,7 @@ def dm01_test_triu():
 def dm02_test_triu(size):
     # 1. 生成上三角矩阵(初始用 triu()函数来构造即可 )
     temp = np.triu(m=np.ones((1, size, size)), k=1).astype('uint8')
-    print(f'temp: \n{temp}')
+    # print(f'temp: \n{temp}')
 
     # 2. 将上三角矩阵转换为下三角矩阵.
     return torch.from_numpy(1 - temp)
@@ -104,7 +105,7 @@ def attention(query, key, value, mask=None, dropout=None):
 # todo 5. 测试注意力机制.
 def use_attention():
     # 1. 获取位置编码处理后的结果(词嵌入层结果 + 位置编码结果)
-    position_x = use_position()
+    position_x = use_position()     # dm01_input 里面的函数，得到处理后的词向量
 
     # 2. 因为是自注意力机制, Q,K,V都用同一个张量.
     query = key = value = position_x
@@ -113,7 +114,7 @@ def use_attention():
     result1, p_attn = attention(query, key, value)
     print(f'result1: {result1.shape}')      # 注意力输出张量的形状: [batch_size, seq_len, d_model] -> [2, 4, 512]
     print(f'p_attn: {p_attn.shape}')        # 注意力权重张量的形状: [batch_size, seq_len, seq_len] -> [2, 4, 4], 表示每个词对其他词的权重.
-    print(' -.- ' * 10 )
+    print('-' * 30 )
 
     # 4. 构造1个全0的掩码张量(简单玩儿玩儿, 看看效果即可)
     mask = torch.zeros(2, 4, 4)
@@ -175,18 +176,20 @@ class MultiHeadAttention(nn.Module):
         # view(...):        把输入张量转成 [batch_size, seq_len, head, d_k] -> [2, 4, 8, 64]   ==> [batch_size, head, seq_len, d_k] -> [2, 8, 4, 64]
         # transpose(1, 2):   把 [batch_size, seq_len, head, d_k] -> [batch_size, head, seq_len, d_k]
         query, key, value = [
-            model(x).view(self.batch, -1, self.head, self.d_k).transpose(1, 2)
-            for model, x in zip(self.linears, (query, key, value))
+            liner(x).view(self.batch, -1, self.head, self.d_k).transpose(1, 2)
+            for liner, x in zip(self.linears, (query, key, value))
         ]
 
         # 4. 多头注意力计算
         # x的形状(注意力输出):      [batch_size, head, seq_len, d_k] -> [2, 8, 4, 64]
         # self.att(注意力权重):    [batch_size, head, seq_len, seq_len] -> [2, 8, 4, 4]
-        x, self.attn = attention(query, key, value, mask, self.dropout)
+        x, self.attn = attention(query, key, value, mask, self.dropout)     # 调用 todo 4 函数
 
         # 5. 将多头注意力结果 -> 合并.
         # 例如: [2, 8, 4, 64] -> [2, 4, 8, 64] -> [2, 4, 512]
         attn_x= x.transpose(1, 2).contiguous().view(self.batch, -1, self.head * self.d_k)
+        # transpose 不会真正移动数据，只改 stride，所以得到的张量是非连续的。
+        # 而 .view() 要求张量在内存中连续, 所以必须调用 .contiguous() 强制复制成连续内存。
 
         # 6. 通过最后1个线性层处理, 返回结果.
         return self.linears[-1](attn_x)
@@ -201,7 +204,7 @@ def use_multihead():
     # 3. 定义遍历, 表示Q, K, V, 因为是自注意力机制, Q,K,V都用同一个张量.
     query = key = value = position_x
     # 4. 创建掩码张量, 形状是: [batch_size, seq_len, seq_len]
-    mask = torch.zeros(8, 4, 4)
+    mask = torch.zeros(8, 4, 4)     # 仅演示用
     # 5. 将数据送给模型 -> 获取多头注意力结果.
     result = my_attention(query, key, value, mask)
     # 6. 打印输出形状, 要与输入的形状保持一致, 即: [2, 4, 512]
@@ -235,6 +238,7 @@ class FeedForward(nn.Module):
         x = self.linear2(x)
         # 4. 返回结果.
         return x
+        # return self.linear2(self.dropout(F.relu(self.linear1(x))))
 
 
 # todo 10. 测试前馈全连接层 -> 先拿到多头注意力层结果, 把结果送给前馈全连接层处理.
