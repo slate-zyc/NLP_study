@@ -91,7 +91,7 @@ def use_sublayer():
     result = sublayer_conn(x, lambda x: MultiHeadAttention(512, 8)(x, x, x))
 
     # 前馈全连接子层
-    # result = sublayer_conn(x, lambda x: FeedForward(d_model=512, d_ff=2048)(x))
+    # result = sublayer_conn(x, FeedForward(d_model=512, d_ff=2048))
 
 
     # 5. 打印子层处理结果.
