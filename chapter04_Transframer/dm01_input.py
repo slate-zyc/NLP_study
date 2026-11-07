@@ -1,4 +1,6 @@
 """
+定义两个类，分别实现 1.词向量且放大 2.加入位置编码后的最终词向量
+
 案例:
     演示Transformer架构中的输入部分 -> 词嵌入层 和 位置编码.
 
@@ -53,11 +55,8 @@ def dm01_embedding():
 
     # 3. 创建张量, 包含2个句子, 每个句子4个单词.
     x = torch.tensor([
-        # (例如)单词
-        # ['我', '爱', '吃', '汤圆'],
-        # ['我', '爱', '吃', '蛋酒'],
-
-        # 单词索引
+        # 单词索引，每个数字表示一个单词索引
+        # 每批次两个句子，每个句子长度为4
         [100, 2, 421, 300],
         [500, 888, 306, 509]
     ])
@@ -83,6 +82,7 @@ class PositionalEncoding(nn.Module):
         super().__init__()
         # 2. 定义dropout层, 防止: 过拟合.
         self.dropout = nn.Dropout(p=dropout)
+
         # 3. 定义pe(Positional Encoding), 用于保存位置编码结果.
         pe = torch.zeros(max_len, d_model)  # shape: [60个词, 512维]
         # 4. 定义1个位置列向量, 范围: 0 ~ max_len - 1
@@ -94,12 +94,12 @@ class PositionalEncoding(nn.Module):
         # 1 / 上述的内容, 所以求倒数: = e ^ ((2i / d_model) * -ln(10000)) -> e ^ (2i * -ln(10000) / d_model)
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))  # 形状: [1, 256]
         # print(f'div_term: {div_term.shape}')     # [256]
+        # 下面的矩阵乘法会自动广播
 
-        # 6. 计算三角函数里边的值.
+        # 6. 利用 4 和 5 计算三角函数里边的值.
         # position形状: [max_len, 1],   div_term形状: [1, 256],   position * div_term形状: [max_len, 256]
         position_value = position * div_term
         # print(f'position_value: {position_value.shape}')    # torch.Size([60, 256])
-
 
         # 7. 进行pe的赋值, 偶数位置使用 正弦函数(sin)
         pe[:, 0::2] = torch.sin(position_value)
@@ -112,6 +112,7 @@ class PositionalEncoding(nn.Module):
 
         # 10. 把pe注册到模型的缓冲区, 利用它, 不断的更新参数.
         self.register_buffer('pe', pe)
+        # register_buffer 是 nn.Module 的一个方法，用来将不需要梯度更新、但属于模型状态的张量（Tensor）注册为“缓冲区”（Buffer）
 
 
     # 2. 前向传播
@@ -119,7 +120,7 @@ class PositionalEncoding(nn.Module):
         # x: 词向量, 形状: [batch_size, seq_len, d_model] -> [2, 4, 512]
         # self.pe: 位置编码信息, 形状: torch.Size([1, 60, 512]
         # 这个代码的核心是: 把 '词向量' 和 '位置编码' 进行相加(融合)
-        x = x + self.pe[:, :x.size(1)]
+        x = x + self.pe[:, :x.size(1)]  # # 省略第三维会自动全选
         # print(f'x.shape: {x.shape}')                                        # [2, 4, 512], 词向量
         # print(f'self.pe[:, :x.size(1)]: {self.pe[:, :x.size(1)].shape}')    # [1, 4, 512], 位置编码信息.
 
@@ -132,7 +133,7 @@ def use_position():
     # 1. 定义词汇表大小 和 词嵌入维度.
     vocab_size, d_model = 1000, 512
 
-    # 2. 实例化Embedding层.
+    # 2. 实例化前面定义的Embedding层.
     my_embed = Embedding(vocab_size, d_model)       # [1000, 512]
 
     # 3. 创建输入张量, 形状是: [batch_size, seq_len], 例如: [2, 4], 2个句子, 每个句子4个单词.
