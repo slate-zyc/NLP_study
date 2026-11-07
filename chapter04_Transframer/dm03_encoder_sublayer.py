@@ -40,13 +40,13 @@ class SublayerConnection(nn.Module):
         :return:
         """
         # 子层的核心逻辑: 有两种常见的实现方式.
-        # 方式1(大多数场景都用这个): 先子层处理, 再残差连接, 层规范化
-        #             随机失活     层规范化    子层处理       残差连接
-        my_result = self.dropout(self.norm(sublayer(x))) + x
+        # 方式1: 先子层处理, 再残差连接, 层规范化（原始论文的处理方式）
+        # 对每个子层的输出先应用 Dropout，随后将其与该子层的输入相加并归一化。（论文原话）
+        # my_result = self.norm(x + self.dropout(sublayer(x)))      # Post-LN
 
-
-        # 方式2: 先规范化层, 再子层处理, 残差连接
-        # 感兴趣, 代码自己写, 代码一样, 就是顺序不同.
+        # 方式2(现在大多数场景都用这个): 先规范化层, 再子层处理, 随机失活 + 残差连接
+        my_result = self.dropout(sublayer(self.norm(x))) + x       # Pre-LN
+        # 残差路径干净、深层稳定，是现代 LLM 的主流选择
 
         # 返回结果.
         return my_result
@@ -63,7 +63,7 @@ def use_sublayer():
         4. 通过子层连接处理输入, 验证残差连接和规范化的效果
     :return:
     """
-    # 1. 准备输入数据(词嵌入 + 位置编码)
+    # 1. 准备输入数据(词嵌入放大 + 位置编码 + dropout)
     x = use_position()
 
     # 2. 实例化子层连接结构.
@@ -82,18 +82,16 @@ def use_sublayer():
     #     # 合并版写法
     #     return MultiHeadAttention(d_model=512, h=8)(x, x, x)
 
-
-
     # 4. 通过子层连接处理输入, 验证残差连接和规范化的效果
     # result = sublayer_conn(x, sublayer)
 
 
     # 思路2: 采用匿名函数(Lambda表达式实现)
     # 多头注意力子层
-    # result = sublayer_conn(x, lambda x: MultiHeadAttention(512, 8)(x, x, x))
+    result = sublayer_conn(x, lambda x: MultiHeadAttention(512, 8)(x, x, x))
 
     # 前馈全连接子层
-    result = sublayer_conn(x, lambda x: FeedForward(d_model=512, d_ff=2048)(x))
+    # result = sublayer_conn(x, lambda x: FeedForward(d_model=512, d_ff=2048)(x))
 
 
     # 5. 打印子层处理结果.
