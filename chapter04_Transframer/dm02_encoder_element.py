@@ -2,9 +2,9 @@
 案例:
     演示Transformer架构的 编码器各个组件介绍.
 
-    编码器组件的组成:
-        多头注意力层 + 残差连接 + 规范化层
-        前馈全连接层 + 残差连接 + 规范化层
+    编码器组件与子层:
+        多头注意力层 + 残差连接 + 规范化层  = 多头注意力子层
+        前馈全连接层 + 残差连接 + 规范化层  = 前馈全连接子层
 
 回顾: 自注意力计算规则
     Attention(Q, K, V) = Softmax(Q * K^t / √d_k) * V
@@ -14,6 +14,11 @@
     下三角矩阵: 对角线上面是0, 下面有值.
 
     Numpy#triu(m, k):  m表示1个矩阵, k: 表示对角线的起始位置(默认值是0), 返回的是: 上三角矩阵.
+
+细节(扩展):
+    ctrl + shift + +/-        展开/折叠所有的代码
+
+面试题: BN(批量归一化) 和 LN(层规范化)的关系和区别?
 """
 
 # 导包
@@ -255,6 +260,54 @@ def use_ff():
     return result
 
 
+# todo 11. 定义1个规范化层, 初始化规范化层(Layer Normalization), 用于对张量进行标准化处理, 让模型训练更稳定.
+class LayerNorm(nn.Module):
+    # 1. 初始化函数.
+    def __init__(self, features, eps=1e-6):
+        """
+        函数作用: 初始化参数, 搭建网络环境的.
+        :param features: 词嵌入维度(词向量维度: 512)
+        :param eps: 小常数, 防止分母变为0
+        """
+        # 1. 初始化父类成员.
+        super().__init__()
+        # 回顾线性公式: y = kx + b -> ax + b
+        # 2. 定义可学习的缩放系数a, 初始化为1, 形状为: [features]
+        # a的作用: 对标准化后的数据进行缩放.
+        self.a = nn.Parameter(torch.ones(features))
+        # 3. 定义可学习的偏置系数b(平移系数), 初始化为0, 形状为: [features]
+        # b的作用: 对标准化后的数据进行平移.
+        self.b = nn.Parameter(torch.zeros(features))
+        # 4. 定义eps: 小常数, 防止分母变为0.
+        self.eps = eps
+
+
+    # 2. 前向传播 -> 实现对张量的标准化处理.
+    def forward(self, x):
+        # x的形状: [batch_size, seq_len, d_model] -> [2, 4, 512]
+        # 1. 计算最后1维(词向量维度)的均值.
+        # 参1: -1表示最后1维,   keepdim=True 表示保持维度.
+        x_mean = x.mean(-1, keepdim=True)       # 形状: [2, 4, 512] -> [2, 4, 1]
+
+        # 2. 计算最后1维的标准差
+        x_std = x.std(-1, keepdim=True)         # 形状: [2, 4, 512] -> [2, 4, 1]
+
+        # 3. 标准化处理 -> 回顾线性公式: y = kx + b -> ax + b
+        return self.a * (x - x_mean) / (x_std + self.eps) + self.b
+
+
+# todo 12. 测试规范化层, 思路: 拿到多头注意力机制结果 -> 把该结果传入前馈全连接进行处理 -> 把处理结果传入规范化层进行处理 -> 返回结果.
+def use_layer_norm():
+    # 1. 获取 前馈全连接层 结果.
+    ff_x = use_ff()
+    # 2. 创建规范化层对象.
+    my_layer_norm = LayerNorm(512)
+    # 3. 将前馈全连接层结果, 传给 规范化层.
+    result = my_layer_norm(ff_x)
+    # 4. 输出结果.
+    print(f'(规范化层)result: {result.shape}')      # [2, 4, 512]
+
+
 
 # todo n.测试代码
 if __name__ == '__main__':
@@ -275,4 +328,7 @@ if __name__ == '__main__':
     # use_multihead()
 
     # 6. 测试: 前馈全连接层.
-    use_ff()
+    # use_ff()
+
+    # 7. 测试: 规范化层.
+    use_layer_norm()
