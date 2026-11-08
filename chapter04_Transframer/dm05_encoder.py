@@ -27,7 +27,7 @@ class Encoder(nn.Module):
         super().__init__()
         # 2. 克隆N个 编码器层对象.
         self.layers = clones(layer, N)  # [第1个编码器层, 第2个编码器层, ..., 第N个编码器层]
-        # 3. 定义最终的规范化层.
+        # 3. 定义最终的规范化层.   Pre-LN 采用
         self.norm = LayerNorm(layer.d_model)        # 512维
 
     # 2. 定义前向传播函数
@@ -35,7 +35,7 @@ class Encoder(nn.Module):
         """
         前向传播函数
         :param x: 输入数据, 维度: [batch_size, seq_len, d_model] -> [2, 4, 512]
-        :param mask: 掩码矩阵, 维度: [batch_size, seq_len, seq_len] -> [8, 4, 4]
+        :param mask: 掩码矩阵, 维度: [batch_size, head, seq_len, seq_len] -> [2, 8, 4, 4]
         :return:
         """
         # 1. x(待处理的数据) 依次经过 N个 编码器层的处理.
