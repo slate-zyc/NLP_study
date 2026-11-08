@@ -40,7 +40,9 @@ class EncoderLayer(nn.Module):
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
 
         # 2. 第2层 子层连接: 前馈全连接层.
-        x = self.sublayer[1](x, lambda x: self.feed_forward(x))
+        # x = self.sublayer[1](x, lambda x: self.feed_forward(x))   # 只需要一个参数无需 lambda 表达式
+        x = self.sublayer[1](x, self.feed_forward)
+
 
         # 3. 返回结果
         return x
@@ -54,16 +56,19 @@ def use_encoder_layer():
 
     # 2. 实例化子层对象.
     # 2.1 多头注意力对象.
-    multi_head = MultiHeadAttention(512, 8)
+    multi_head = MultiHeadAttention(512, 8, 0.2)
 
     # 2.2 前馈全连接对象.
-    feed_forward = FeedForward(512, 2048)
+    feed_forward = FeedForward(512, 2048,0.2)
 
     # 3. 创建编码器层对象.
-    encoder_layer = EncoderLayer(512, multi_head, feed_forward)
+    encoder_layer = EncoderLayer(512, multi_head, feed_forward, 0.2)
 
-    # 4. 构建掩码张量, 形状: [batch_size, seq_len, seq_len] -> [2, 4, 4]
-    mask = torch.zeros(8, 4, 4)
+    # 4. 构建掩码张量
+    mask = torch.zeros(8, 4, 4)     # 后续会广播
+    # 这里会广播到[2,8,4,4] 与scores保持一致
+    # 这里有广播机制，甚至可以写torch.zeros(1)
+    # 注意广播机制从右到左，要求匹配/为1/缺失
 
     # 5. 执行编码器层 -> 前向传播.
     output = encoder_layer(x, mask)
@@ -72,8 +77,8 @@ def use_encoder_layer():
     print(f'编码器层输出形状: {output.shape}')      # [batch_size, seq_len, d_model] ->  [2, 4, 512]
     print(f'编码器层的输出内容: {output}')
     print(f'编码器层的输出内容: {output[:1, :2, :5]}')       # 第1个句子, 前2个单词, 每个单词的前5个特征
-    print(' -.- ' * 10)
 
+    print('-' * 30)
     print(f'编码器层对象: \n{encoder_layer}')
 
 
