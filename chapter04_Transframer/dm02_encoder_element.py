@@ -92,7 +92,7 @@ def attention(query, key, value, mask=None, dropout=None):
     # 3. 掩码处理(可选)
     if mask is not None:
         # 将scores中, 遮挡的部分, 设置为负无穷(极小值), 这样softmax()后这些位置的权重会接近0(对应: Decoder中'不能看未来位置'的需求)
-        scores = scores.masked_fill(mask == 0, -1e9)
+        scores = scores.masked_fill(mask == 0, -1e9)    # 会广播
 
     # 4. 计算注意力权重.
     # dim=-1, 在最后1个维度上进行归一化, 让每个query位置的权重总和为 1
@@ -169,9 +169,10 @@ class MultiHeadAttention(nn.Module):
     def forward(self, query, key, value, mask=None):
         # 1. 判断是否要掩码.
         # Q, K, V的形状: [batch_size, seq_len, d_model], 例如: [2, 4, 512]
-        # mask的形状: [batch_size, seq_len, seq_len], 例如: [1, 4, 4]
+        # mask的形状: [head, seq_len, seq_len], 例如: [8, 4, 4]
         if mask is not None:
-            mask = mask.unsqueeze(0)
+            mask = mask.unsqueeze(0)    # [8,4,4] -->[1,8,4,4]
+        # 这里不是必须，因为有广播机制
 
         # 2. 获取batch_size的批量大小,
         self.batch = query.size(0)
