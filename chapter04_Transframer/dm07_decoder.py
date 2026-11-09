@@ -88,7 +88,7 @@ def use_decoder():
     # 10. 跑一遍解码流程: 输入 -> 6个解码器层 -> 输出
     result = my_decoder(position_y, encoder_output, source_mask, target_mask)
     print(f'解码器的形状: {result.shape}')      # [2, 4, 512]
-    # print(f'解码器对象: \n{my_decoder}')
+    print(f'解码器对象: \n{my_decoder}')
 
     # 11. 返回解码器处理后的结果.
     return result
