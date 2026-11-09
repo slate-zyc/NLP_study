@@ -51,7 +51,7 @@ class DecoderLayer(nn.Module):
         # 1. 经过第1个子层 -> 多头自注意力机制层(掩码多头注意力机制)
         x = self.sublayers[0](x, lambda x: self.self_attn(x, x, x, target_mask))
         # 2. 经过第2个子层 -> 多头注意力机制层(编码器-解码器)
-        x = self.sublayers[1](x, lambda x: self.src_attn(x, encoder_output, encoder_output, source_mask))
+        x = self.sublayers[1](x, lambda t: self.src_attn(t, encoder_output, encoder_output, source_mask))
         # 3. 经过第3个子层 -> 前向传播层(前馈全连接层)
         x = self.sublayers[2](x, self.feed_forward)
         # 4. 返回结果
