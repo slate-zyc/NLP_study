@@ -22,6 +22,9 @@ word2vec介绍:
     ## 不用管这一部分了，全是高度封装的东西
     # 用这个包主要是因为这个数据类型，正常可以用gensim包
 
+
+pip install fasttext-community      这个支持
+
 """
 
 # 导包
@@ -90,13 +93,13 @@ def dm04_set_hyper_parameter():
 # todo 5. 测试代码
 if __name__ == '__main__':
     # 1. 测试: 训练向量模型, 并保存模型.
-    # dm01_train_save()
+    dm01_train_save()
 
     # 2. 测试: 加载模型, 并预测.
-    # dm02_get_word_vector()
+    dm02_get_word_vector()
 
     # 3. 测试: 查看单词的相似度(即: 找单词的近义词) -> 模型的效果检验.
-    # dm03_get_similarity()
+    dm03_get_similarity()
 
     # 4. 测试: 模型超参数设定
     dm04_set_hyper_parameter()
