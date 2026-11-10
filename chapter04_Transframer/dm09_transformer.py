@@ -52,7 +52,8 @@ class EncoderDecoder(nn.Module):
 
         # 4. 返回结果.
         return output
-
+        # return self.generator(self.decode(target_y, self.encode(source_x, source_mask),
+        #                                   source_mask, target_mask))
 
     # 3. 得到编码器的输出结果, 即:编码器的前向传播过程.
     def encode(self, source_x, source_mask):
@@ -161,7 +162,7 @@ def make_model():
     target_mask = c(source_mask)
 
     # 4. 执行前向传播.
-    print(' -.- ' * 10)
+    print('-' * 30)
     result = my_transformer(source_x, target_y, source_mask, target_mask)
     print(f'result是Transformer的输出结果: {result}')
     print(f'result的形状: {result.shape}')     # [2, 4, 1000]
