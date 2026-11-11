@@ -18,7 +18,9 @@
         What is the correct consistency of a cream soup?            __label__soup
         What is the correct consistency of a cream soup?            __label__texture
         What is the correct consistency of a cream soup?            __label__standards
+        ......
 
+    训练集标签总数为多少每句话就会分为几个二分类问题，如本例为 735
 
 细节:
     1. Fasttext确实训练和预测较快, 但是精度相对不是特别高, 我们可以优化下.
@@ -98,7 +100,7 @@ def dm03_epoch():
     print(f'模型在测试集上的测试结果: {result3}')       # [验证集样本数量, 精度(准确率), 召回率]
 
 
-# todo 4. 上步基础上, 调整: 学习率(默认: 5轮)
+# todo 4. 上步基础上, 调整: 学习率(默认: 0.1)
 def dm04_learning_rate():
     # 1. 获取训练模型(有监督训练: 有特征, 有标签) -> 得到训练好的模型.
     model = fasttext.train_supervised('./data/cooking.pre.train', epoch=30, lr=1)
@@ -138,7 +140,7 @@ def dm05_ngram():
     print(f'模型在测试集上的测试结果: {result3}')       # [验证集样本数量, 精度(准确率), 召回率]
 
 
-# todo 6. 上步基础上, 调整: 损失函数, 从传统的softmax() -> hs(层次softmax): 负采样 + softmax + 哈夫曼树
+# todo 6. 上步基础上, 调整: 损失函数, 从传统的softmax() -> hs(层次softmax)  ns(负采样)
 def dm06_loss():
     # 1. 获取训练模型(有监督训练: 有特征, 有标签) -> 得到训练好的模型.
     model = fasttext.train_supervised('./data/cooking.pre.train', epoch=30, lr=1, wordNgrams=2, loss='hs')
@@ -158,7 +160,7 @@ def dm06_loss():
     print(f'模型在测试集上的测试结果: {result3}')       # [验证集样本数量, 精度(准确率), 召回率]
 
 
-# todo 7. 上步基础上, 调整: 从手动调参改为自动调参.
+# todo 7. 调整: 从手动调参改为自动调参.
 def dm07_auto():
     # 1. 获取训练模型(有监督训练: 有特征, 有标签) -> 得到训练好的模型.
     model = fasttext.train_supervised(
@@ -177,7 +179,7 @@ def dm07_auto():
     print(f'result2的预测结果为: {result2}')
 
     # 3. 测试模型(看看日志)
-    result3 = model.test('./data/cooking.pre.valid')
+    result3 = model.test('./data/cooking.pre.valid')        # 这里严格来说其实没意义了，因为验证集数据已经用于调参了
     print(f'模型在测试集上的测试结果: {result3}')  # [验证集样本数量, 精度(准确率), 召回率]
 
 
@@ -198,7 +200,7 @@ def dm08_multi_label():
     print(f'result1的预测结果为: {result1}')
 
     # 参1: 预测第2条样本, 参2: k=-1的含义是: 预测所有标签(尽可能多的显示)
-    result2 = model.predict('using liquid nitrogen for tenderizing octopus ?', k=-1)
+    result2 = model.predict('using liquid nitrogen for tenderizing octopus ?', k=-1, threshold=0.5)
     print(f'result2的预测结果为: {result2}')
 
     # 3. 测试模型(看看日志)
@@ -210,42 +212,48 @@ def dm08_multi_label():
 def dm09_save():
     # 1.获取训练模型(有监督训练: 有特征, 有标签) -> 获取训练好的模型.
     # 参1: 训练集的路径, 参2: 训练轮数, 参3: 学习率, 参4: n-gram.
-    model = fasttext.train_supervised('./data/cooking.pre.train', epoch=30, lr=1, wordNgrams=2)
+    model = fasttext.train_supervised(
+        input='./data/cooking.pre.train',  # 指定 训练集的 路径.
+        epoch=25,  # 训练轮数.
+        lr=0.2,  # 学习率.
+        wordNgrams=2,  # n-gram.
+        loss='ova'  # 多分类多标签问题: 逻辑回归 -> one-vs-all
+    )
 
     # 2. 保存模型.
-    model.save_model('./model/fasttext_model.model')
+    model.save_model('./model/fasttext_model.bin')
 
     # 3. 模型加载.
-    model2 = fasttext.load_model('./model/fasttext_model.model')
+    model2 = fasttext.load_model('./model/fasttext_model.bin')
 
     # 4.使用模型进行预测.
     # 参1: 预测第1条样本,  参2: k代表预测的标签数量,  参3: 阈值(至于大于该阈值的标签才会被保留)
-    result1 = model2.predict('how is mass egg-frying performed ?', k=3, threshold=0.5)
+    result1 = model2.predict('how is mass egg-frying performed ?', k=-1, threshold=0.5)
     print(f'result1的预测结果为: {result1}')
 
 
 
 # todo n.测试代码
 if __name__ == '__main__':
-    # 1. 测试: 直接训练.
+    # # 1. 测试: 直接训练.
     # dm01_basic()            # (3000, 0.14566666666666667, 0.06299553120945654)
-
-    # 2. 测试: 对数据做预处理.
+    #
+    # # 2. 测试: 对数据做预处理.
     # dm02_data_preprocess()  # (3000, 0.178, 0.07697852097448465)
-
-    # 3. 测试: 增加训练轮数.
+    #
+    # # 3. 测试: 增加训练轮数.
     # dm03_epoch()            # (3000, 0.544, 0.23526019893325645)
-
-    # 4. 测试: 改变学习率.
+    #
+    # # 4. 测试: 改变学习率.
     # dm04_learning_rate()    # (3000, 0.5873333333333334, 0.25400028830906735)
-
-    # 5. 测试: 改变N-Gram.
+    #
+    # # 5. 测试: 改变N-Gram.
     # dm05_ngram()            # (3000, 0.6166666666666667, 0.26668588727115466)
-
-    # 6. 测试: 改变损失函数.
+    #
+    # # 6. 测试: 改变损失函数.
     # dm06_loss()             # (3000, 0.6023333333333334, 0.2604872423237711)
 
-    # 7. 测试: 自动调参.
+    # # 7. 测试: 自动调参.
     # dm07_auto()               # (3000, 0.544, 0.23526019893325645)
 
     # 8. 测试: 多分类多标签问题.
