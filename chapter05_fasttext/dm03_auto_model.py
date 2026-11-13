@@ -423,17 +423,17 @@ def dm06_ner():
 
 # todo 7.测试代码
 if __name__ == '__main__':
-    # # 1. 测试Transformers的自动模型方式处理NLP任务 -> 情感分类
-    # dm01_text_classification()
+    # 1. 测试Transformers的自动模型方式处理NLP任务 -> 情感分类
+    dm01_text_classification()
 
-    # # 2. 测试Transformers的自动模型方式处理NLP任务 -> 特征提取
-    # dm02_feature_extraction()
+    # 2. 测试Transformers的自动模型方式处理NLP任务 -> 特征提取
+    dm02_feature_extraction()
 
-    # # 3. 测试Transformers的自动模型方式处理NLP任务 -> 完形填空
-    # dm03_fill_mask()
+    # 3. 测试Transformers的自动模型方式处理NLP任务 -> 完形填空
+    dm03_fill_mask()
 
-    # # 4. 测试Transformers的自动模型方式处理NLP任务 -> 阅读理解
-    # dm04_question_answering()
+    # 4. 测试Transformers的自动模型方式处理NLP任务 -> 阅读理解
+    dm04_question_answering()
 
     # 5. 测试Transformers的自动模型方式处理NLP任务 -> 文本摘要
     dm05_summarization()
