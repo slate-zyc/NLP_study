@@ -18,6 +18,8 @@ from transformers import AutoModelForSequenceClassification, AutoModelForMaskedL
 # AutoModelForSeq2SeqLM  用于 序列到序列的 建模(例如: 文本摘要)
 # AutoModelForTokenClassification 用于 做token级分类(例如: NER) 的建模
 from transformers import AutoModelForSeq2SeqLM, AutoModelForTokenClassification
+from transformers.models.nllb_moe import modeling_nllb_moe
+
 
 # from rich import print          # 输出美化(效果不明显, 你写不写都行)
 
@@ -25,97 +27,66 @@ from transformers import AutoModelForSeq2SeqLM, AutoModelForTokenClassification
 # todo 1.情感分类任务.
 # 例如: 情绪分类 -> '今天开心极了...'       积极的情绪
 # 例如: 商品分类 -> '手机壳', '数码配件'...  '连衣裙' -> 服饰
+# def dm01_text_classification():
+#     # # 1. 加载 Tokenizer -> 分词器对象, 把文本 转成 模型可接收的输入格式.
+#     # my_tokenizer = AutoTokenizer.from_pretrained(r'C:\Software\CentOS_All\PretrainedModel\chinese_sentiment')
+#     #
+#     # # 2. 加载模型.
+#     # my_model = AutoModelForSequenceClassification.from_pretrained(r'C:\Software\CentOS_All\PretrainedModel\chinese_sentiment')
+#
+#     my_tokenizer = AutoTokenizer.from_pretrained("techthiyanes/chinese_sentiment")      # 下载过的模型不会再次下载
+#     # my_model = AutoModelForSequenceClassification.from_pretrained("techthiyanes/chinese_sentiment", device_map="auto")
+#     # # device_map="auto" 参数底层依赖 accelerate 库来自动分配设备  pip install accelerate
+#     my_model = AutoModelForSequenceClassification.from_pretrained("techthiyanes/chinese_sentiment")
+#     # 不使用 device_map="auto"，手动决定在 GPU 还是 CPU 运行
+#     print("模型所在设备:", my_model.device)  # cuda:0 说明就是在GPU上运行
+#
+#     # 3. 文本转张量.
+#     # 3.1 定义文本.
+#     message = '人生该如何起头'
+#
+#     # 3.2 思路1: return_tensors='pt' 返回的是: 二维张量(Tensor)
+#     msg_tensor1 = my_tokenizer.encode(
+#         text=message,               # 待编码的文本
+#         return_tensors='pt',        # 返回张量的类型, 默认为: None, 可选:'pt','tf','np'
+#         padding='max_length',       # 是否填充
+#         truncation=True,            # 是否截断
+#         max_length=5,               # (指定输入的)最大长度
+#     )
+#     # 格式为: msg_tensor1: tensor([[ 101,  782, 4495, 6421,  102]]), 类型: <class 'torch.Tensor'>
+#     print(f'msg_tensor1: {msg_tensor1}, 类型: {type(msg_tensor1)}')
+#
+#     # 3.3 思路2: 不用return_tensors='pt', 返回的是 一维列表, 需要手动转成张量.
+#     msg_list2 =my_tokenizer.encode(
+#         text=message,               # 待编码的文本
+#         padding='max_length',       # 是否填充
+#         truncation=True,            # 是否截断
+#         max_length=5,               # (指定输入的)最大长度
+#     )
+#     # 格式为: msg_list2: [101, 782, 4495, 6421, 102], 类型: <class 'list'>
+#     print(f'msg_list2: {msg_list2}, 类型: {type(msg_list2)}')
+#
+#     # 手动把上述的列表转成二维张量.
+#     msg_tensor2 = torch.tensor([msg_list2])
+#     # 若使用GPU，则需要讲张量放到GPU上
+#     device = next(my_model.parameters()).device  # 或 my_model.device
+#     msg_tensor2 = msg_tensor2.to(device)
+#     print(f'msg_tensor2: {msg_tensor2}, 类型: {type(msg_tensor2)}')
+#
+#     # 4. 把数据送给模型进行推理.
+#     # 4.1 设置模型为: 推理模式(评估模式) -> 会关闭Dropout等训练特有的层.
+#     my_model.eval()
+#     # 4.2 直接调用模型(模型推理)
+#     result = my_model(msg_tensor2)
+#     print(f'result(包含模型输出的字典): {result}')
+#
+#     # 4.3 使用 return_dict=False, 可以返回: 元组.
+#     result2 = my_model(msg_tensor2, return_dict=False)
+#     print(f'result2(包含模型输出的元组): {result2}')
+
+# 新版代码
 def dm01_text_classification():
-    # 1. 加载 Tokenizer -> 分词器对象, 把文本 转成 模型可接收的输入格式.
-    my_tokenizer = AutoTokenizer.from_pretrained(r'C:\Software\CentOS_All\PretrainedModel\chinese_sentiment')
-
-    # 2. 加载模型.
-    my_model = AutoModelForSequenceClassification.from_pretrained(r'C:\Software\CentOS_All\PretrainedModel\chinese_sentiment')
-
-    # 3. 文本转张量.
-    # 3.1 定义文本.
-    message = '人生该如何起头'
-
-    # 3.2 思路1: return_tensors='pt' 返回的是: 二维张量(Tensor)
-    msg_tensor1 = my_tokenizer.encode(
-        text=message,               # 待编码的文本
-        return_tensors='pt',        # 返回张量的类型, 默认为: None, 可选:'pt','tf','np'
-        padding='max_length',       # 是否填充
-        truncation=True,            # 是否截断
-        max_length=5,               # (指定输入的)最大长度
-    )
-    # 格式为: msg_tensor1: tensor([[ 101,  782, 4495, 6421,  102]]), 类型: <class 'torch.Tensor'>
-    # print(f'msg_tensor1: {msg_tensor1}, 类型: {type(msg_tensor1)}')
-
-    # 3.3 思路2: 不用return_tensors='pt', 返回的是 一维列表, 需要手动转成张量.
-    msg_list2 =my_tokenizer.encode(
-        text=message,               # 待编码的文本
-        padding='max_length',       # 是否填充
-        truncation=True,            # 是否截断
-        max_length=5,               # (指定输入的)最大长度
-    )
-    # 格式为: msg_list2: [101, 782, 4495, 6421, 102], 类型: <class 'list'>
-    # print(f'msg_list2: {msg_list2}, 类型: {type(msg_list2)}')
-
-    # 手动把上述的列表转成二维张量.
-    msg_tensor2 = torch.tensor([msg_list2])
-    # print(f'msg_tensor2: {msg_tensor2}, 类型: {type(msg_tensor2)}')
-
-    # 4. 把数据送给模型进行推理.
-    # 4.1 设置模型为: 推理模式(评估模式) -> 会关闭Dropout等训练特有的层.
-    my_model.eval()
-    # 4.2 直接调用模型(模型推理)
-    result = my_model(msg_tensor2)
-    print(f'result(包含模型输出的字典): {result}')
-
-    # 4.3 使用 return_dict=False, 可以返回: 元组.
-    result2 = my_model(msg_tensor2, return_dict=False)
-    print(f'result2(包含模型输出的元组): {result2}')
-
-
-# todo 2. 特征提取任务.
-def dm02_feature_extraction():
-    # 1. 加载 Tokenizer -> 分词器对象, 把文本 转成 模型可接收的输入格式.
-    my_tokenizer = AutoTokenizer.from_pretrained(r'C:\Software\CentOS_All\PretrainedModel\bert-base-chinese')
-
-    # 2. 加载模型.
-    my_model = AutoModel.from_pretrained(r'C:\Software\CentOS_All\PretrainedModel\bert-base-chinese')
-
-    # 3. 文本转张量.
-    # 3.1 定义遍历, 记录: 待处理的文本.
-    messsage = ['你是谁', '人生该如何起头']
-
-    # 3.2 把上述的文本 转成 模型可接收的输入格式.
-    # 返回值是字典形式, 其中各个键(key)的意思是:
-    #  input_ids: 文本的id序列 -> 对应模型的 vocab.txt 文件
-    #  token_type_ids: 文本的token序列
-    #  attention_mask: 注意力掩码, 1(真实), 0(填充)
-    msg_tensor = my_tokenizer.encode_plus(
-        text = messsage,        # 待处理的文本
-        return_tensors='pt',    # 返回张量的类型
-        padding='max_length',   # 是否填充
-        truncation=True,        # 是否截断
-        max_length=30,          # (指定输入的)最大长度
-    )
-    # print(f'msg_tensor: {msg_tensor}')
-
-    # 4. 给模型喂数据, 提取特征.
-    my_model.eval()     # 切换到: 评估模式(推理模式)
-    output = my_model(**msg_tensor)
-
-    # 5. 获取模型输出 -> 打印结果.
-    # print(f'output: \n{output}')
-    # 最后一个(隐藏状态)层输出 -> [batch_size, seq_len, hidden_size]       # [1, 30, 768]
-    print(f'output.last_hidden_state: {output.last_hidden_state.shape}')
-
-    # 池化层输出 -> [batch_size, hidden_size], [1, 768]
-    print(f'output.pooler_output: {output.pooler_output.shape}')
-
-
-# todo 3. 完形填空任务.
-def dm03_fill_mask():
-    # 0. 定义遍历, 记录: 模型名.
-    model_name = r'C:\Software\CentOS_All\PretrainedModel\chinese-bert-wwm'
+    model_name = "hfl/chinese-bert-wwm"
 
     # 1. 加载Tokenizer分词器.
     my_tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -124,16 +95,121 @@ def dm03_fill_mask():
     my_model = AutoModelForMaskedLM.from_pretrained(model_name)
 
     # 3. 文本转张量.
-    input = my_tokenizer.encode_plus('我想明天去[MASK]家吃饭', return_tensors='pt')
-    # print(f'input: {input}')
+    message = '人生该如何起头'
+
+    # ---------------------------------------------------------
+    # 3.2 思路1: 直接调用分词器，传 return_tensors='pt'
+    # ---------------------------------------------------------
+    msg_tensor1 = my_tokenizer(
+        text=message,
+        return_tensors='pt',
+        padding='max_length',
+        truncation=True,
+        max_length=5,
+    )
+    # 注意：新版本返回的是 BatchEncoding (字典)，不是纯 Tensor！
+    print(f'msg_tensor1: {msg_tensor1}, 类型: {type(msg_tensor1)}')
+
+    # ---------------------------------------------------------
+    # 3.3 思路2: 返回列表，手动转张量
+    # ---------------------------------------------------------
+    msg_dict2 = my_tokenizer(
+        text=message,
+        padding='max_length',
+        truncation=True,
+        max_length=5,
+    )
+
+    # 【关键修复】必须从字典中提取出真正的 input_ids 列表
+    msg_list2 = msg_dict2['input_ids']
+    print(f'msg_list2: {msg_list2}, 类型: {type(msg_list2)}')  # 这里才是真正的 list
+
+    # 手动把上述的列表转成二维张量.
+    msg_tensor2 = torch.tensor([msg_list2])
+
+    device = next(my_model.parameters()).device
+    msg_tensor2 = msg_tensor2.to(device)
+    print(f'msg_tensor2: {msg_tensor2}, 类型: {type(msg_tensor2)}')
+
+    # ---------------------------------------------------------
+    # 4. 模型推理
+    # ---------------------------------------------------------
+    my_model.eval()
+
+    # 针对思路1的推理（【最推荐写法】）：由于 msg_tensor1 是字典，直接解包传给模型最完美
+    # 这样模型能同时拿到 input_ids 和 attention_mask
+    result = my_model(**msg_tensor1)
+    print(f'result(包含模型输出的字典): {result}')
+
+    # 针对思路2的推理：由于 msg_tensor2 是纯纯的 input_ids 张量，可以直接传
+    result2 = my_model(msg_tensor2, return_dict=False)
+    print(f'result2(包含模型输出的元组): {result2}')
+
+# todo 2. 特征提取任务.
+def dm02_feature_extraction():
+    # model_name = r'C:\Software\CentOS_All\PretrainedModel\bert-base-chinese'
+    model_name = "cambridgeltl/tacl-bert-base-chinese"
+    # 1. 加载 Tokenizer -> 分词器对象, 把文本 转成 模型可接收的输入格式.
+    my_tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    # 2. 加载模型.
+    my_model = AutoModel.from_pretrained(model_name)
+
+    # 3. 文本转张量.
+    # 3.1 定义遍历, 记录: 待处理的文本.
+    message = ['你是谁', '人生该如何起头']
+
+    # 3.2 把上述的文本 转成 模型可接收的输入格式.
+    # 返回值是字典形式, 其中各个键(key)的意思是:
+    #  input_ids: 文本的id序列 -> 对应模型的 vocab.txt 文件
+    #  token_type_ids: 用于区分句子对 (单句全为0, 句子对中前句为0, 后句为1)
+    #  attention_mask: 注意力掩码, 1(真实token), 0(填充的PAD)
+    msg_tensor = my_tokenizer(
+        text = message,        # 待处理的文本
+        return_tensors='pt',    # 返回张量的类型
+        padding='max_length',   # 是否填充
+        truncation=True,        # 是否截断
+        max_length=30,          # (指定输入的)最大长度
+    )
+    print(f'msg_tensor: {msg_tensor}')
+
+    # 4. 给模型喂数据, 提取特征.
+    my_model.eval()     # 切换到: 评估模式(推理模式)
+    output = my_model(**msg_tensor)
+
+    # 5. 获取模型输出 -> 打印结果.
+    print(f'output: \n{output}')
+    # 最后一个(隐藏状态)层输出 -> [batch_size, seq_len, hidden_size]       # [2, 30, 768]
+    print(f'output.last_hidden_state: {output.last_hidden_state.shape}')
+
+    # 池化层输出 -> [batch_size, hidden_size], [2, 768]
+    print(f'output.pooler_output: {output.pooler_output.shape}')
+
+
+
+# todo 3. 完形填空任务.
+def dm03_fill_mask():
+    # 0. 定义变量, 记录: 模型名.
+    # model_name = r'C:\Software\CentOS_All\PretrainedModel\chinese-bert-wwm'
+    model_name = "hfl/chinese-bert-wwm"
+
+    # 1. 加载Tokenizer分词器.
+    my_tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    # 2. 加载模型.
+    my_model = AutoModelForMaskedLM.from_pretrained(model_name)
+
+    # 3. 文本转张量.
+    inputs = my_tokenizer('我想明天去[MASK]家吃饭', return_tensors='pt')
+    print(f'input: {inputs}')
 
     # 4. 给模型喂数据, 获取模型输出.
     my_model.eval()     # 评估模式
-    output = my_model(**input)
+    output = my_model(**inputs)
 
     # 5. 获取结果, 并打印.
-    # print(f'output: \n{output}')
-    # print(f'output.logits: {output.logits.shape}')      # [1, 11, 21128]
+    print(f'output: \n{output}')
+    print(f'output.logits: {output.logits.shape}')      # [1, 11, 21128]
 
     # [MASK]位置的索引: [1, 11, 21128]  -> [11, 21128] -> [21128]
     mask_predict_idx = torch.argmax(output.logits[0][6]).item()
@@ -146,7 +222,8 @@ def dm03_fill_mask():
 # todo 4. 阅读理解 -> 抽取式问答任务, 即: 给定一段文本和问题, 让模型输出结果.
 def dm04_question_answering():
     # 0. 定义遍历, 记录: 模型名
-    model_name = r'C:\Software\CentOS_All\PretrainedModel\chinese_pretrain_mrc_roberta_wwm_ext_large'
+    # model_name = r'C:\Software\CentOS_All\PretrainedModel\chinese_pretrain_mrc_roberta_wwm_ext_large'
+    model_name = "luhua/chinese_pretrain_mrc_roberta_wwm_ext_large"
 
     # 1. 加载分词器对象Tokenizer
     my_tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -161,7 +238,7 @@ def dm04_question_answering():
     for question in questions:
         # 4.1 把上述的问题 转成 模型可接收的输入格式.
         # 参1: 当前的问题. 参2: 包含答案的上下文文本. 参3: 返回张量的形式.
-        input = my_tokenizer.encode_plus(question, context, return_tensors='pt')
+        input = my_tokenizer(question, context, return_tensors='pt')
         # 返回值字典, 各个键(key)的意思是:
         #  input_ids: [CLS] + 问题 + [SEP] + 上下文 + [SEP]     注意: 空格不统计.
         #  token_type_ids: 0 -> 问题, 1 -> 上下文
@@ -189,6 +266,61 @@ def dm04_question_answering():
         print(f'question: {question}, answer: {answer}')
         print('\n' * 3)
 
+# def dm04_question_answering():
+#     # 0. 定义变量, 记录: 模型名 (修复错别字)
+#     # 注意：large 模型较大（约1.3GB），如果电脑内存/显存不够，建议换成本地 base 模型
+#     # model_name = r'C:\Software\CentOS_All\PretrainedModel\chinese_pretrain_mrc_roberta_wwm_ext_large'
+#     model_name = "luhua/chinese_pretrain_mrc_roberta_wwm_ext_large"
+#
+#     # 1. 加载分词器对象Tokenizer
+#     my_tokenizer = AutoTokenizer.from_pretrained(model_name)
+#     # 2. 加载模型.
+#     my_model = AutoModelForQuestionAnswering.from_pretrained(model_name)
+#
+#     # 3. 准备文本. 细节: 上下文最好不要写空格, 会影响模型定位, 空格会被删除, 可以换成标签符号.
+#     context = '我叫张三,我是一个程序员,我的喜好是乒乓球'
+#     questions = ['我是谁?', '我是做什么的?', '我的爱好是什么?']
+#
+#     # 4. 该模型是针对于每个问题进行问答推理的, 即: 逐个问题生成, 此处要用for循环.
+#     for question in questions:
+#         # 4.1 把上述的问题 转成 模型可接收的输入格式.
+#         # 参1: 当前的问题. 参2: 包含答案的上下文文本.
+#         # 【修复】变量名 input 改为 inputs
+#         inputs = my_tokenizer(question, context, return_tensors='pt')
+#
+#         # 4.2 给模型喂数据, 获取模型输出.
+#         my_model.eval()
+#         output = my_model(**inputs)
+#
+#         # 4.3 获取结果
+#         # start_logits 和 end_logits 的形状都是 [1, 26] (表示每个 token 作为答案开头/结尾的概率得分)
+#
+#         # 4.4 计算模型预测的答案(开头的位置索引, 结束的位置索引)
+#         # 【关键修复】使用 .item() 将 tensor 转换为 Python 整数
+#         start = torch.argmax(output.start_logits).item()
+#         end = torch.argmax(output.end_logits).item() + 1  # 因为切片时, 包左不包右, 所以: 结束位置索引 + 1
+#         print(f'start: {start}, end: {end}')
+#
+#         # 4.5 获取模型预测的答案
+#         # 提取对应位置的 token id
+#         answer_ids = inputs.input_ids[0][start:end]
+#
+#         # 【优化】使用 decode 替代 convert_ids_to_tokens，输出更干净可读
+#         # 注意：tokenizer.decode 会把被拆分的子词重新拼成完整的词
+#         answer = my_tokenizer.decode(answer_ids, skip_special_tokens=True)
+#
+#         # 4.6 打印最终效果.
+#         print(f'question: {question}, answer: {answer}')
+#         print('-' * 30)
+#         # start: 8, end: 10
+#         # question: 我是谁?, answer: 张 三
+#         # ------------------------------
+#         # start: 18, end: 21
+#         # question: 我是做什么的?, answer: 程 序 员
+#         # ------------------------------
+#         # start: 28, end: 31
+#         # question: 我的爱好是什么?, answer: 乒 乓 球
+#         # ------------------------------
 
 # todo 5. 文本摘要: 摘要生成任务的输入一段文本, 输出是有一段概况, 简单的文字.
 def dm05_summarization():
@@ -209,7 +341,9 @@ def dm05_summarization():
            "has to predict if the two sentences were following each other or not."
 
     # 2. 定义遍历, 记录: 模型名
-    model_name = r'C:\Software\CentOS_All\PretrainedModel\distilbart-cnn-12-6'
+    # model_name = r'C:\Software\CentOS_All\PretrainedModel\distilbart-cnn-12-6'
+    model_name = "philschmid/distilbart-cnn-12-6-samsum"
+
     # 3. 加载分词器对象Tokenizer 和 模型对象.
     my_tokenizer = AutoTokenizer.from_pretrained(model_name)
     my_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
@@ -240,7 +374,8 @@ def dm05_summarization():
 # 命名实体识别: 本质上是一个分类任务(又叫序列标注任务), 实体词识别是句法分析的基础, 而句法分析又是NLP任务的核心.
 def dm06_ner():
     # 0. 定义遍历, 记录: 模型名.
-    model_name = r'C:\Software\CentOS_All\PretrainedModel\roberta-base-finetuned-cluener2020-chinese'
+    # model_name = r'C:\Software\CentOS_All\PretrainedModel\roberta-base-finetuned-cluener2020-chinese'
+    model_name = "uer/roberta-base-finetuned-cluener2020-chinese"
 
     # 1. 加载分词器.
     my_tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -250,7 +385,7 @@ def dm06_ner():
     config = AutoConfig.from_pretrained(model_name)
 
     # 4. 数据张量化 -> 把输入文本转换成模型可接收的输入格式.
-    input = my_tokenizer.encode_plus('我爱北京天安门, 天安门上太阳升!', return_tensors='pt')
+    input = my_tokenizer('我爱北京天安门, 天安门上太阳升!', return_tensors='pt')
     print(f'input: {input}')
 
     # 5. 把数据喂给模型, 获取结果.
@@ -288,20 +423,20 @@ def dm06_ner():
 
 # todo 7.测试代码
 if __name__ == '__main__':
-    # 1. 测试Transformers的自动模型方式处理NLP任务 -> 情感分类
+    # # 1. 测试Transformers的自动模型方式处理NLP任务 -> 情感分类
     # dm01_text_classification()
 
-    # 2. 测试Transformers的自动模型方式处理NLP任务 -> 特征提取
+    # # 2. 测试Transformers的自动模型方式处理NLP任务 -> 特征提取
     # dm02_feature_extraction()
 
-    # 3. 测试Transformers的自动模型方式处理NLP任务 -> 完形填空
+    # # 3. 测试Transformers的自动模型方式处理NLP任务 -> 完形填空
     # dm03_fill_mask()
 
-    # 4. 测试Transformers的自动模型方式处理NLP任务 -> 阅读理解
+    # # 4. 测试Transformers的自动模型方式处理NLP任务 -> 阅读理解
     # dm04_question_answering()
 
     # 5. 测试Transformers的自动模型方式处理NLP任务 -> 文本摘要
-    # dm05_summarization()
+    dm05_summarization()
 
     # 6. 测试Transformers的自动模型方式处理NLP任务 -> NER
     dm06_ner()
