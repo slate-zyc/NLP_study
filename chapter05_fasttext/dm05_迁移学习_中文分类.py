@@ -8,8 +8,8 @@
         label                   text
         标签(1:好评,0:差评)       文本
 """
-import warnings
-warnings.filterwarnings("ignore")       # 忽略警告
+# import warnings
+# warnings.filterwarnings("ignore")       # 忽略警告
 
 
 # 导包
@@ -20,18 +20,27 @@ from datasets import load_dataset               # HuggingFace的数据集加载�
 import time                                     # 时间模块
 from tqdm import tqdm                           # 导入进度条库
 from transformers import BertTokenizer, BertModel   # 导入BERT相关组件(中文分词器, 预训练的BERT模型)
-from transformers import AdamW                  # 导入AdaW优化器, 内置权重衰减 -> 防止过拟合...
 from rich import print                          # 终端打印美化.
 import torch.optim as optim                     # 优化器, 例如: SGD, Adam, AdaW...
 
 # 使用GPU或者MPS(苹果的M系列芯片)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# todo 1. 加载分词器.
-my_tokenizer = BertTokenizer.from_pretrained(r'C:\Software\CentOS_All\PretrainedModel\bert-base-chinese')
-# todo 2. 加载模型.
-my_pre_model = BertModel.from_pretrained(r'C:\Software\CentOS_All\PretrainedModel\bert-base-chinese').to(device)
+# # todo 1. 加载分词器.
+# my_tokenizer = BertTokenizer.from_pretrained(r'C:\Software\CentOS_All\PretrainedModel\bert-base-chinese')
+# # todo 2. 加载模型.
+# my_pre_model = BertModel.from_pretrained(r'C:\Software\CentOS_All\PretrainedModel\bert-base-chinese').to(device)
 
+# # todo 1. 加载分词器.
+# my_tokenizer = BertTokenizer.from_pretrained("cambridgeltl/tacl-bert-base-chinese")
+# # todo 2. 加载模型.
+# my_pre_model = BertModel.from_pretrained("cambridgeltl/tacl-bert-base-chinese").to(device)
+
+# from_pretrained 会直接在这个目录下寻找 model.safetensors 或 pytorch_model.bin
+# todo 1. 加载分词器.
+my_tokenizer = BertTokenizer.from_pretrained("./HuggingFace_PretrainedModel/hub/models--cambridgeltl--tacl-bert-base-chinese/snapshots/c86daf0753de79319b2066897a54c6cae64daf85")
+# todo 2. 加载模型.
+my_pre_model = BertModel.from_pretrained("./HuggingFace_PretrainedModel/hub/models--cambridgeltl--tacl-bert-base-chinese/snapshots/c86daf0753de79319b2066897a54c6cae64daf85").to(device)
 
 # todo 3.定义函数, 加载数据集. 即: 从CSV文件加载 训练集, 测试集, 验证集数据.
 def dm_file2dataset():
@@ -49,14 +58,14 @@ def dm_file2dataset():
     print(f'训练数据的长度: {len(train_dataset)}')  #  9600
     print(f'训练数据(第1条): {train_dataset[0]}')
     print(f'训练数据(前3条): {train_dataset[:3]}')
-    print(' -.- ' * 10)
+    print('-' * 30)
 
     # ----------------------------------- 加载测试数据集 -----------------------------------
     test_dataset = load_dataset(path='csv', data_files=r'./data/test.csv', split='train')
     print(f'test_dataset: {test_dataset}')
     print(f'测试数据集的长度: {len(test_dataset)}')     # 1200
     print(f'测试数据(前3条): {test_dataset[:3]}')
-
+    print('-' * 30)
 
     # 加载验证集数据集.
     valid_dataset = load_dataset(path='csv', data_files=r'./data/validation.csv', split='train')
@@ -76,7 +85,7 @@ def collate_fn1(data):      # data = 8条数据/批次
     labels = [item["label"] for item in data]   # 标签
 
     # 2. 批量编码文本: 将文本转成模型输入格式 -> 通过分词器实现.
-    inputs = my_tokenizer.batch_encode_plus(
+    inputs = my_tokenizer(
         sents,                  # 输入文本列表(待处理的文本列表)
         truncation=True,        # 启用文本截断
         max_length=300,         # 最大序列长度
@@ -139,24 +148,27 @@ class AiModel(nn.Module):
         """
         # 1. 不计算BERT预训练模型的梯度(冻结参数)
         # 作用: 避免更新预训练模型参数, 仅训练自定义模型(分类层)的参数.
-        # with torch.no_grad():
-        #     # 2. 获取BERT模型的输出.
-        #     bert_output = my_pre_model(
-        #         input_ids=input_ids,
-        #         token_type_ids=token_type_ids,
-        #         attention_mask=attention_mask,
-        #     )
+        with torch.no_grad():
+            # 2. 获取BERT模型的输出.
+            bert_output = my_pre_model(
+                input_ids=input_ids,
+                token_type_ids=token_type_ids,
+                attention_mask=attention_mask,
+            )
 
-        # 2. 获取BERT模型的输出.
-        bert_output = my_pre_model(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask,
-        )
+        # # 2. 获取BERT模型的输出.
+        # bert_output = my_pre_model(
+        #     input_ids=input_ids,
+        #     token_type_ids=token_type_ids,
+        #     attention_mask=attention_mask,
+        # )
 
         # 3. 使用bert的 pooler_output 进行分类.
         # bert_output.pooler_output: [batch_size, 768]
         output = self.linear(bert_output.pooler_output)
+        # pooler_out 是在last_hidden_state[:, 0, :]的基础上再过一个 Linear+tanh
+        # 即最后一层 [CLS] 位置隐状态再过一个 Linear+tanh
+        # 选 [CLS] 是因为它是 BERT 预训练时专门用来聚合整句信息的位置
 
         # 4. 返回处理后的分类结果
         return output
@@ -169,6 +181,8 @@ def use_AiModel():
     # 2. 实例化模型 -> 创建基于BERT的分类模型.
     # 3. 将模型移动到GPU中.
     my_model = AiModel().to(device)
+    print('mymodel--->', my_model)
+
     # 4. 迭代数据并测试输出, 细节: 这里我们仅仅测试1批次的数据, 避免长时间运行.
     for input_ids, token_type_ids, attention_mask, labels in my_dataloader:
         # 4.1 把上述的数据移动到GPU中.
@@ -186,10 +200,10 @@ def use_AiModel():
 # todo 8. 训练模型. 流程: 加载数据 -> 初始化模型 -> 配置训练参数 -> 迭代训练 -> 保存模型.
 def train_model():
     # 1. 加载训练集
-    train_dataset = load_dataset(path='csv', data_files=r'./data/train.csv', split='train')
+    # train_dataset = load_dataset(path='csv', data_files=r'./data/train.csv', split='train')
     # 2. 创建模型, 并移动到指定设备.
     my_model = AiModel().to(device)
-    # 3. 冻结BERT预训练模型的参数.
+    # 3. 不训练预训练模型 只让预训练模型计算数据特征 不需要计算梯度
     for param in my_pre_model.parameters():
         # param.requires_grad_ = False # 效果一样
         param.requires_grad_(False)
@@ -197,7 +211,7 @@ def train_model():
     # 4. 创建损失函数对象.
     criterion = nn.CrossEntropyLoss(reduction='mean')
     # 5. 创建优化器对象.
-    optimizer = optim.Adam(my_model.parameters(), lr=1e-3)
+    optimizer = optim.AdamW(my_model.parameters(), lr=1e-3)
     # 6. 设置模型为训练模式.
     my_model.train()
     # 7. 开始具体的训练过程 -> 假设训练3轮.
@@ -208,7 +222,8 @@ def train_model():
         my_dataloader = get_dataloader()
 
         # 7.3 具体的 本轮的 每批次的 训练过程.
-        for i, (input_ids, token_type_ids, attention_mask, labels) in enumerate(tqdm(my_dataloader), start=1):
+        # for i, (input_ids, token_type_ids, attention_mask, labels) in enumerate(tqdm(my_dataloader), start=1):
+        for i, (input_ids, token_type_ids, attention_mask, labels) in enumerate(my_dataloader, start=1):
             # 7.3.1 将参数移动到指定设备(GPU)
             input_ids = input_ids.to(device)
             token_type_ids = token_type_ids.to(device)
@@ -234,7 +249,7 @@ def train_model():
                 print(f'轮数: {epoch_idx + 1}, 迭代的步数: {i}, 当前的损失值: {loss:.2f}, (Acc)准确率: {acc:.2f}, 耗时: {use_time:.2f}s')
 
         # 7.4 走到这里, 说明本轮训练完毕, 保存模型.
-        torch.save(my_model.state_dict(), f'./model/classification_{epoch_idx + 1}.bin')
+        torch.save(my_model.state_dict(), f'./model/classification_eporch_{epoch_idx + 1}.bin')
 
 
 # todo 9. 模型评估函数. 流程: -> 加载数据 -> 创建加载器 -> 加载模型 -> 批量预测 -> 计算准确率 -> 打印结果.
@@ -250,7 +265,7 @@ def evaluate_model():
         collate_fn=collate_fn1,         # 指定数据整理函数, 即: 每批次的数据都要被这个函数处理.
     )
     # 3. 加载训练好的模型.
-    path = './model/classification_3.bin'
+    path = './model/classification_eporch_3.bin'
     my_model = AiModel().to(device)
     my_model.load_state_dict(torch.load(path))  # 加载训练好的模型参数.
 
@@ -260,31 +275,31 @@ def evaluate_model():
     my_model.eval()
 
     # 6. 迭代预测, 通过数据加载器获取每批次数据, 预测, 统计即可.
-    for i, (input_ids, token_type_ids, attention_mask, labels) in enumerate(tqdm(my_dataloader), start=1):
+    for i, (input_ids, token_type_ids, attention_mask, labels) in enumerate(my_dataloader, start=1):
         # 6.1 将参数移动到指定设备(GPU)
         input_ids = input_ids.to(device)
         token_type_ids = token_type_ids.to(device)
         attention_mask = attention_mask.to(device)
         labels = labels.to(device)
-        # 6.2 不计算梯度.
+        # 6.2 不计算梯度. 测试阶段是因为可以节省显存和算了
         with torch.no_grad():
             # 6.3 前向传播 -> 输入数据, 给模型 -> 获取结果.
             output = my_model(input_ids, token_type_ids, attention_mask)
-            # 6.4 获取预测结果, 对输出获取最大值索引, 即: 概率.
-            temp = torch.argmax(output, dim=-1)
-            # 6.5 统计预测正确的样本数.
-            correct += (temp == labels).sum().item()
-            # 6.6 统计总样本数.
-            total += len(labels)
-            # 6.7 输出预测进度, 间隔20步打印一次.
-            if i % 20 == 0:
-                # 打印平均准确率
-                print(f'Acc(准确率): {correct / total:.2f}')
 
-                # 解码第1个样本的文本, 并打印预测结果.
-                text_list = my_tokenizer.decode(input_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
-                print(f'原始文本是: {text_list}')
-                print(f'预测的标签是: {temp[0]}, 真实标签是: {labels[0]}')
+        # 6.4 获取预测结果, 对输出获取最大值索引, 即: 概率.
+        temp = torch.argmax(output, dim=-1)
+        # 6.5 统计预测正确的样本数.
+        correct += (temp == labels).sum().item()
+        # 6.6 统计总样本数.
+        total += len(labels)
+        # 6.7 输出预测进度, 间隔20步打印一次.
+        if i % 20 == 0:
+            # 打印平均准确率
+            print(f'Acc(准确率): {correct / total:.2f}')
+            # 解码第1个样本的文本, 并打印预测结果.
+            text_list = my_tokenizer.decode(input_ids[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
+            print(f'原始文本是: {text_list}')
+            print(f'预测的标签是: {temp[0]}, 真实标签是: {labels[0]}')
 
 
 
@@ -303,8 +318,8 @@ if __name__ == '__main__':
 
 
     # 3. 测试模型结构.
-    # 会报警告, 因为你当前用的PyTorch版本没有编译'flash attention'加速功能.  'flash attention'是斯坦福大学提出的一种 高效注意力计算优化技术.
-    # 如果你追求极致的性能, 可以尝试: 安装编译了'flash attention'的PyTorch版本, 但是步骤复杂: GPU, CUDA版, 从源码编译PyTorch, 且windows环境配置难度更高.
+    # 如果当前用的PyTorch版本没有编译'flash attention'加速功能会报警告.  'flash attention'是斯坦福大学提出的一种 高效注意力计算优化技术.
+    # 当前使用的torh版本是支持的，没有包v
     # use_AiModel()
 
     # 4. 模型训练.
